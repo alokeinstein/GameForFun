@@ -1,0 +1,16 @@
+{
+  "name": "@mafia/web",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node -e \"console.log('Web scaffold ready for Milestone 1 Next.js setup')\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mafia/shared": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "typescript": "^5.8.2"
+  }
+}
