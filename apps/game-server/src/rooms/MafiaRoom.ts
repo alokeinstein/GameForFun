@@ -28,6 +28,7 @@ import {
   MafiaRoomState,
   PlayerState
 } from "@mafia/shared";
+import { recordCompletedMatch, MatchParticipantSummary } from "../services/matchArchival.js";
 
 interface JoinOptions {
   displayName?: string;
@@ -50,6 +51,7 @@ export class MafiaRoom extends Room<MafiaRoomState> {
   private phaseTimer: colyseus.Delayed | null = null;
   private nightVictimId: string | null = null;
   private eliminatedPlayerId: string | null = null;
+  private matchStartedAt: number = 0;
 
   onCreate(options: any) {
     this.setState(new MafiaRoomState());
@@ -385,6 +387,7 @@ export class MafiaRoom extends Room<MafiaRoomState> {
 
   private startGame() {
     this.clearPhaseTimer();
+    this.matchStartedAt = Date.now();
     this.state.phase = Phase.ROLE_ASSIGNMENT;
     this.state.roundNumber = 1;
     this.state.phaseStartedAt = Date.now();
@@ -676,6 +679,45 @@ export class MafiaRoom extends Room<MafiaRoomState> {
       isGameOverReveal: true,
       winningTeam,
       allRoles
+    });
+
+    // Asynchronously persist match history & player statistics to database
+    const participants: MatchParticipantSummary[] = [];
+    for (const [id, player] of this.state.players.entries()) {
+      const role = this.secretRoles.get(id) || Role.CITIZEN;
+      participants.push({
+        sessionId: id,
+        displayName: player.displayName,
+        role,
+        isAlive: player.isAlive,
+        eliminationCause: !player.isAlive
+          ? id === this.nightVictimId
+            ? "NIGHT_KILL"
+            : id === this.eliminatedPlayerId
+            ? "VOTED_OUT"
+            : "DISCONNECTED"
+          : null,
+        eliminatedRound: player.isAlive ? null : this.state.roundNumber
+      });
+    }
+
+    recordCompletedMatch({
+      roomCode: this.state.roomCode,
+      hostSessionId: this.state.hostId,
+      winningTeam,
+      startedAt: this.matchStartedAt || (Date.now() - 60000),
+      endedAt: Date.now(),
+      totalRounds: this.state.roundNumber,
+      config: {
+        isDevMode: this.state.config.isDevMode,
+        mafiaPercentage: this.state.config.mafiaPercentage,
+        nightDurationSec: this.state.config.nightDurationSec,
+        discussionDurationSec: this.state.config.discussionDurationSec,
+        votingDurationSec: this.state.config.votingDurationSec
+      },
+      participants
+    }).catch((err) => {
+      console.warn("[MafiaRoom] Failed to archive match to database:", err);
     });
   }
 

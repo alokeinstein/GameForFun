@@ -3,6 +3,7 @@ import { MafiaRoomState } from "@mafia/shared";
 
 const SERVER_URL = process.env.NEXT_PUBLIC_GAME_SERVER_URL || "ws://localhost:2567";
 
+export const HTTP_SERVER_URL = SERVER_URL.replace(/^ws/, "http");
 export const colyseusClient = new Client(SERVER_URL);
 
 const RECONNECT_TOKEN_KEY = "mafia_reconnect_token";

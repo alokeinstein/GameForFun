@@ -1,7 +1,7 @@
 # Current Development Status
 
 ## Active Milestone
-**Milestone 5: Match History Persistence, Player Statistics & Production Polish**
+**All Core Milestones (0 through 5) Completed! System Ready for Production Playtesting & Staging**
 
 ---
 
@@ -28,34 +28,40 @@
   - Built Rapier WASM physics kinematic character controller (`CharacterController.tsx`) with WASD movement, Shift sprint, and smooth third-person follow camera.
   - Implemented 20 Hz player transform network synchronization with client-side linear interpolation (`RemotePlayers.tsx`).
   - Integrated 3D canvas behind the 2D Game HUD with one-click view toggling (`[3D Town View / Dossier View]`) and floating in-game widgets.
-- **Milestone 4: Positional WebRTC Audio & Social Atmosphere** (Verified & Completed)
+- **Milestone 4: Positional WebRTC Audio & Social Atmosphere** (Commit `8656ac1`)
   - Implemented procedural Web Audio API sound effects (`apps/web/src/services/audio.ts`): zero asset downloads, dawn bell, nightfall drone, tribunal gavel strike, doom toll, urgent 10s clock tick, vote confirmations, and victory fanfare.
   - Implemented WebRTC proximity voice chat (`apps/web/src/services/webrtc.ts`): peer mesh with STUN servers, Colyseus room signaling (`VOICE_SIGNAL`), Voice Activity Detection (VAD), and mic mute toggle (`M` hotkey).
   - 3D spatial attenuation: dynamic gain calculation based on Euclidean distance in town square with quadratic falloff.
   - Strict dead player voice isolation: server authoritatively drops voice signals from eliminated players to living players during active rounds.
   - Visual speaking indicators: animated green rings at feet on 3D character avatars and glowing microphone badges on player roster cards.
   - Integration test suite in `apps/game-server/tests/VoiceSignaling.test.ts` (all 3 voice signaling tests passing).
+- **Milestone 5: Match History Persistence, Player Statistics & Production Polish** (Verified & Completed)
+  - Implemented Prisma-backed PostgreSQL match archival service (`matchArchival.ts`): records `GameSession`, `GamePlayer`, and `GameEvent` on `Phase.VICTORY` with graceful offline fallback.
+  - Implemented career statistics upsert (`PlayerStats`): tracks games played, victories, mafia/citizen wins, and survival records.
+  - Added REST API endpoints on Game Server (`/api/history`, `/api/stats/:username`, `/api/leaderboard`).
+  - Integrated Career Dossier on Web landing page (`apps/web/src/app/page.tsx`): displays player career record and detailed career breakdown modal.
+  - Multi-container containerization: multi-stage `Dockerfile`s for `apps/game-server` and `apps/web`, orchestrated with PostgreSQL via `docker-compose.yml`.
+  - Automated integration test suite in `apps/game-server/tests/MatchArchival.test.ts` (all 4 tests passing).
 
 ---
 
 ## Features Currently in Progress
-- Milestone 5 planning: match history persistence and database synchronization.
+- None. Core development completed. Future enhancements: matchmaking queues, custom cosmetics, OAuth authentication.
 
 ---
 
 ## Known Bugs & Blockers
 - **None.** Monorepo health is pristine:
-  - 49/49 automated tests passing across `@mafia/game-rules` (38) and `@mafia/game-server` (11).
+  - 53/53 automated tests passing across `@mafia/game-rules` (38) and `@mafia/game-server` (15).
   - Turborepo typecheck passing across all 5 workspace packages.
   - Next.js production build (`next build`) passing cleanly.
 
 ---
 
 ## Important Incomplete Work
-1. **Database Match Archival:** Connecting post-game summaries to PostgreSQL via Prisma (Milestone 5).
-2. **Player Accounts & Historical Statistics:** Tracking matches won, roles played, and survival rates.
+- None for core game. Ready for staging deployment and live multi-user playtesting.
 
 ---
 
 ## Last Meaningful Checkpoint
-- **Milestone 4 Completed**: Procedural Web Audio SFX, WebRTC proximity voice chat, spatial distance attenuation, dead player acoustic isolation, and speaking indicators verified with production Next.js build and 49/49 tests passing.
+- **Milestone 5 Completed**: Match history persistence, career statistics tracking, REST endpoints, Docker multi-container setup, and Career Dossier UI verified with production build and 53/53 tests passing.

@@ -2,24 +2,50 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Plus, ArrowRight, Shield, Skull, Eye, Radio, Sparkles } from "lucide-react";
+import { Users, Plus, ArrowRight, Shield, Skull, Eye, Radio, Sparkles, Trophy, Award, History } from "lucide-react";
 import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from "@mafia/shared";
-import { getSavedPlayerName, savePlayerName } from "../services/colyseus";
+import { getSavedPlayerName, savePlayerName, HTTP_SERVER_URL } from "../services/colyseus";
 
 export default function HomePage() {
   const router = useRouter();
   const [nickname, setNickname] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [playerStats, setPlayerStats] = useState<any | null>(null);
+  const [showStatsModal, setShowStatsModal] = useState(false);
 
   useEffect(() => {
-    setNickname(getSavedPlayerName() || "");
+    const saved = getSavedPlayerName() || "";
+    setNickname(saved);
+    if (saved.trim()) {
+      fetchStats(saved.trim());
+    }
   }, []);
+
+  const fetchStats = async (name: string) => {
+    try {
+      const res = await fetch(`${HTTP_SERVER_URL}/api/stats/${encodeURIComponent(name)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPlayerStats(data.stats);
+      } else {
+        setPlayerStats(null);
+      }
+    } catch {
+      setPlayerStats(null);
+    }
+  };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.slice(0, 16);
     setNickname(val);
     savePlayerName(val);
+  };
+
+  const handleNameBlur = () => {
+    if (nickname.trim()) {
+      fetchStats(nickname.trim());
+    }
   };
 
   const handleCreateRoom = () => {
@@ -87,10 +113,32 @@ export default function HomePage() {
               type="text"
               value={nickname}
               onChange={handleNameChange}
+              onBlur={handleNameBlur}
               placeholder="e.g. Alok, Vito, Shadow"
               className="w-full px-4 py-3 bg-noir-950 border border-noir-700 rounded-xl text-white placeholder-noir-600 focus:outline-none focus:border-blood-500 focus:ring-1 focus:ring-blood-500 text-base font-semibold transition"
             />
           </div>
+
+          {/* Career Record Badge */}
+          {playerStats && (
+            <div className="flex items-center justify-between px-3 py-2 bg-noir-950/70 border border-noir-800 rounded-xl">
+              <div className="flex items-center space-x-2 text-xs font-mono">
+                <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-white font-bold">{playerStats.gamesWon} Wins</span>
+                <span className="text-noir-600">•</span>
+                <span className="text-noir-400">{playerStats.gamesPlayed} Matches</span>
+                <span className="text-noir-600">•</span>
+                <span className="text-emerald-400">{playerStats.timesSurvived} Survived</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowStatsModal(true)}
+                className="text-[11px] font-mono text-blood-400 hover:text-blood-300 underline font-bold"
+              >
+                Dossier
+              </button>
+            </div>
+          )}
 
           {error && (
             <div className="text-xs font-mono text-blood-400 bg-blood-600/10 border border-blood-500/20 px-3 py-2 rounded-lg">
@@ -159,6 +207,57 @@ export default function HomePage() {
             </p>
           </div>
         </div>
+
+        {/* Career Dossier Modal */}
+        {showStatsModal && playerStats && (
+          <div className="fixed inset-0 z-50 bg-noir-950/80 backdrop-blur-md flex items-center justify-center p-4">
+            <div className="max-w-md w-full bg-noir-900 border border-noir-800 rounded-2xl p-6 shadow-2xl space-y-6">
+              <div className="flex items-center justify-between border-b border-noir-800 pb-4">
+                <div className="flex items-center space-x-2">
+                  <Award className="w-5 h-5 text-amber-400" />
+                  <h3 className="font-bold text-white text-lg">Career Dossier</h3>
+                </div>
+                <button
+                  onClick={() => setShowStatsModal(false)}
+                  className="text-noir-400 hover:text-white font-mono text-xs px-2.5 py-1 rounded-lg bg-noir-800 hover:bg-noir-700 transition"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-noir-950/60 border border-noir-800">
+                  <span className="text-xs font-mono text-noir-400">Agent Alias</span>
+                  <span className="text-sm font-bold text-white font-mono">{nickname}</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3.5 rounded-xl bg-noir-950/60 border border-noir-800 text-center">
+                    <span className="block text-[10px] font-mono uppercase text-noir-400">Total Matches</span>
+                    <span className="text-2xl font-black text-white font-mono">{playerStats.gamesPlayed}</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-noir-950/60 border border-noir-800 text-center">
+                    <span className="block text-[10px] font-mono uppercase text-noir-400">Victories</span>
+                    <span className="text-2xl font-black text-amber-400 font-mono">{playerStats.gamesWon}</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-blood-950/20 border border-blood-900/30 text-center">
+                    <span className="block text-[10px] font-mono uppercase text-blood-400">Mafia Wins</span>
+                    <span className="text-2xl font-black text-blood-400 font-mono">{playerStats.mafiaWins}</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-900/30 text-center">
+                    <span className="block text-[10px] font-mono uppercase text-emerald-400">Citizen Wins</span>
+                    <span className="text-2xl font-black text-emerald-400 font-mono">{playerStats.citizenWins}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-noir-950/60 border border-noir-800 flex items-center justify-between text-xs font-mono">
+                  <span className="text-noir-400">Survival Tally</span>
+                  <span className="text-emerald-400 font-bold">{playerStats.timesSurvived} Survived / {playerStats.timesEliminated} Casualties</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

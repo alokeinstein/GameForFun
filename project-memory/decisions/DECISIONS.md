@@ -119,3 +119,21 @@
 - **Decision:** Implement peer-to-peer proximity voice chat using browser WebRTC peer connections signaled directly through the authoritative Colyseus room (`VOICE_SIGNAL`), with distance attenuation calculated dynamically in 3D and dead player voice isolation enforced at both the server signaling layer and client audio gain layer.
 - **Reason:** Eliminates the need for a separate third-party voice signaling server; spatial quadratic distance falloff replicates realistic in-person social deduction; strict server-side dropping of voice signals from eliminated players prevents dead players from spoiling secret roles or communicating outside their spectator channel.
 - **Impact:** Delivers immersive, tamper-proof proximity audio with visual speaking indicators on 3D character avatars and player cards.
+
+---
+
+### DEC-014: Asynchronous Post-Match Session Archival with Offline Graceful Fallback
+- **Date:** 2026-11-03
+- **Area:** Database / Backend Architecture
+- **Decision:** Execute match history persistence (`GameSession`, `GamePlayer`, `PlayerStats`) asynchronously on transition to `Phase.VICTORY`, and catch/suppress database errors if `DATABASE_URL` is unconfigured or unreachable.
+- **Reason:** In-memory Colyseus room execution must never be blocked or crashed by database I/O latency or transient connection failures. Developers and automated test suites running without an active PostgreSQL instance can still run complete matches without failure.
+- **Impact:** Robust, non-blocking persistence that gracefully degrades to in-memory play when offline.
+
+---
+
+### DEC-015: Multi-Container Production Orchestration via Docker Compose
+- **Date:** 2026-11-03
+- **Area:** DevOps / Infrastructure
+- **Decision:** Containerize the full stack into three distinct services (`postgres`, `game-server`, and `web`) using multi-stage Dockerfiles and root `docker-compose.yml`.
+- **Reason:** Provides a single, reproducible development and production environment (`docker compose up`) that matches production staging, manages PostgreSQL volume persistence, and isolates build-time dependencies.
+- **Impact:** Zero-configuration local startup and straightforward container deployment to any cloud provider.

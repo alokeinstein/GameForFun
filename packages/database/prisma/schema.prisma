@@ -41,8 +41,8 @@ model User {
 model GameSession {
   id              String         @id @default(uuid())
   roomCode        String         @unique
-  hostUserId      String
-  host            User           @relation("HostedGames", fields: [hostUserId], references: [id])
+  hostUserId      String?
+  host            User?          @relation("HostedGames", fields: [hostUserId], references: [id])
   status          String         // LOBBY, IN_PROGRESS, COMPLETED, CANCELLED
   winner          MatchResult?
   configJson      String         // Stored settings: timers, mafia %, revote rules

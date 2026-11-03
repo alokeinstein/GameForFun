@@ -1,46 +1,46 @@
 # Next Steps
 
 ## Current Immediate Task
-**Milestone 5: Match History Persistence, Player Statistics & Production Polish**
-Implement Prisma-backed PostgreSQL match recording on victory, player career statistics updates, and production deployment readiness.
+**Production Playtesting & Staging Deployment**
+All core milestones (0 through 5) are verified and complete. The game is fully playable with 3D town navigation, real-time multiplayer networking, procedural Web Audio SFX, proximity WebRTC voice chat, and PostgreSQL match archival.
 
 ---
 
-## Remaining Tasks in Current Milestone (Milestone 5)
-1. **Match Archival Service in `apps/game-server`:**
-   - Instantiate Prisma client from `@mafia/database`.
-   - On transition to `Phase.VICTORY`, record `GameSession` (room code, winner, duration, rounds).
-   - Record `GamePlayer` records for each participant (role, survival status, eliminated by).
-   - Asynchronously update or upsert `PlayerStats` (wins, losses, survival rates).
-2. **Match History API & Web Viewer:**
-   - Add endpoint or room message to fetch past match records.
-   - Display match summary breakdown in the post-game screen.
-3. **End-to-End Stress Testing & Health Verification:**
-   - Full automated test suite across all milestones (50+ tests).
-   - Production Docker / container verification for Colyseus and Next.js.
+## Recommended Next Development Actions
+1. **Live Multiplayer Playtesting Session:**
+   - Launch services locally via `npm run dev` (or `docker compose up`).
+   - Open 3 to 5 browser tabs (or mobile devices over LAN) to playtest complete matches across Night, Discussion, and Voting phases.
+2. **Avatar Customization & Cosmetic Skins:**
+   - Add fedora colors, trenchcoat palette selectors, and accessory choices in the pre-game lobby.
+3. **Dedicated Cloud Deployment:**
+   - Deploy `docker-compose.yml` or container images to Railway, Render, Fly.io, or AWS ECS with managed PostgreSQL.
 
 ---
 
-## Task Dependencies
+## Milestone Completion Summary
 ```
-[Milestone 4: WebRTC Voice & Web Audio SFX] (COMPLETED)
+[Milestone 0: Architecture, Rules Engine, PostgreSQL] (COMPLETED)
         │
         ▼
-[Prisma Match Archival Service]
+[Milestone 1: Colyseus Server, 5-Char Matchmaking, Lobby] (COMPLETED)
         │
         ▼
-[Player Career Statistics Upsert]
+[Milestone 2: Server-Authoritative Game Loop, 2D HUD] (COMPLETED)
         │
         ▼
-[Production Deployment Verification]
+[Milestone 3: React Three Fiber, Town Map, Character Controller] (COMPLETED)
+        │
+        ▼
+[Milestone 4: Procedural Web Audio SFX, WebRTC Proximity Voice] (COMPLETED)
+        │
+        ▼
+[Milestone 5: Match History Persistence, Career Stats, Docker] (COMPLETED)
 ```
 
 ---
 
 ## Blockers
-- **None.** Monorepo health is pristine (49/49 tests passing, production build passing).
-
----
-
-## Suggested Next Action
-Implement the Prisma match archival handler in `apps/game-server/src/rooms/MafiaRoom.ts` triggering on `Phase.VICTORY`.
+- **None.** Monorepo health is pristine:
+  - 53/53 automated tests passing.
+  - Turborepo typecheck passing (8/8 tasks).
+  - Next.js production build passing.

@@ -5,6 +5,11 @@ import colyseus from "colyseus";
 const { Server, matchMaker } = colyseus;
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { MafiaRoom } from "./rooms/MafiaRoom.js";
+import {
+  getRecentMatchHistory,
+  getPlayerStatistics,
+  getLeaderboard
+} from "./services/matchArchival.js";
 
 const PORT = Number(process.env.PORT) || 2567;
 const app = express();
@@ -40,6 +45,30 @@ app.get("/api/rooms/:roomCode", async (req, res) => {
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
+});
+
+// Recent match history endpoint
+app.get("/api/history", async (req, res) => {
+  const limit = Number(req.query.limit) || 10;
+  const history = await getRecentMatchHistory(limit);
+  return res.json({ history });
+});
+
+// Player statistics endpoint
+app.get("/api/stats/:username", async (req, res) => {
+  const username = req.params.username;
+  const stats = await getPlayerStatistics(username);
+  if (!stats) {
+    return res.status(404).json({ error: "Player statistics not found" });
+  }
+  return res.json({ stats });
+});
+
+// Leaderboard endpoint
+app.get("/api/leaderboard", async (req, res) => {
+  const limit = Number(req.query.limit) || 10;
+  const leaderboard = await getLeaderboard(limit);
+  return res.json({ leaderboard });
 });
 
 const httpServer = http.createServer(app);

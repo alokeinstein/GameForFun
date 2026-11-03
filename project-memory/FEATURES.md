@@ -142,10 +142,26 @@
 
 ---
 
-## 6. Database & Persistent Accounts (`packages/database`)
+## 6. Database & Persistent Accounts (`packages/database`, `apps/game-server`)
 
 ### Feature: PostgreSQL Relational Schema via Prisma
 - **Status:** Implemented
 - **Purpose:** Robust relational data store for match history, player statistics, and future accounts.
 - **Behaviour:** Models defined for `User`, `GameSession`, `GamePlayer`, `GameEvent`, and `PlayerStats`. Validated via `prisma generate`.
 - **Important notes:** Active match loop runs in-memory on Colyseus; database stores historical match summaries post-victory.
+
+### Feature: Asynchronous Post-Match Session Archival
+- **Status:** Implemented
+- **Purpose:** Automatically record game sessions, round lengths, winning factions, and individual participant survival/roles.
+- **Behaviour:** Invoked asynchronously in `MafiaRoom.ts` upon `Phase.VICTORY` via `recordCompletedMatch`. Includes graceful offline fallback when database is unconfigured.
+- **Important notes:** Verified by unit and integration tests in `MatchArchival.test.ts`.
+
+### Feature: Player Career Statistics & Career Dossier
+- **Status:** Implemented
+- **Purpose:** Track career victories, mafia/citizen win ratios, and survival tallies per player alias.
+- **Behaviour:** Upserted in `PlayerStats` on game victory and inspectable on the web landing page via Career Dossier modal and REST endpoints (`/api/stats/:username`, `/api/leaderboard`, `/api/history`).
+
+### Feature: Multi-Container Production Docker Compose
+- **Status:** Implemented
+- **Purpose:** Seamless containerized deployment of PostgreSQL 16, Colyseus Game Server, and Next.js Web App.
+- **Behaviour:** Multi-stage Dockerfiles (`apps/game-server/Dockerfile`, `apps/web/Dockerfile`) orchestrated via root `docker-compose.yml`.

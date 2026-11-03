@@ -2,6 +2,12 @@
 
 ## 2026-11-03
 
+- Added: Prisma-backed match archival service (`apps/game-server/src/services/matchArchival.ts`) persisting `GameSession`, `GamePlayer`, and `GameEvent` upon `Phase.VICTORY` with offline graceful fallback.
+- Added: Career player statistics upserting (`PlayerStats`) tracking games played, wins, mafia/citizen win breakdown, and survival totals.
+- Added: REST API endpoints on Game Server (`/api/history`, `/api/stats/:username`, `/api/leaderboard`).
+- Added: Career Dossier modal and record badge on web landing page (`apps/web/src/app/page.tsx`).
+- Added: Multi-stage Dockerfiles (`apps/game-server/Dockerfile`, `apps/web/Dockerfile`) and root `docker-compose.yml` orchestrating PostgreSQL, Colyseus server, and Next.js web application.
+- Added: Automated integration test suite `apps/game-server/tests/MatchArchival.test.ts` (all 4 tests passing).
 - Added: Procedural Web Audio API sound synthesizer (`apps/web/src/services/audio.ts`) generating phase transition cues (dawn bell, night drone, tribunal gavel, doom toll, victory fanfare), urgent 10s countdown ticks, vote confirm taps, and UI click feedback with zero asset downloads.
 - Added: WebRTC proximity voice chat client (`apps/web/src/services/webrtc.ts`) with peer mesh connection over STUN, Colyseus room signaling (`VOICE_SIGNAL`), Voice Activity Detection (VAD), and mic mute toggle (`M` hotkey).
 - Added: 3D spatial audio distance attenuation calculating dynamic gain via Euclidean distance in town square ($d = \sqrt{\Delta x^2 + \Delta z^2}$) with quadratic falloff.

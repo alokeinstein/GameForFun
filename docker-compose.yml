@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mafia-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: mafia
+      POSTGRES_PASSWORD: mafiasecret
+      POSTGRES_DB: mafiadb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mafia -d mafiadb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  game-server:
+    build:
+      context: .
+      dockerfile: apps/game-server/Dockerfile
+    container_name: mafia-game-server
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 2567
+      DATABASE_URL: postgresql://mafia:mafiasecret@postgres:5432/mafiadb?schema=public
+    ports:
+      - "2567:2567"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: mafia-web
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_GAME_SERVER_URL: ws://localhost:2567
+    ports:
+      - "3000:3000"
+    depends_on:
+      - game-server
+
+volumes:
+  postgres_data:
