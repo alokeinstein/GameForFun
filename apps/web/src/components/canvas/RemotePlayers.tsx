@@ -1,16 +1,18 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { PlayerState } from "@mafia/shared";
 import { CharacterAvatar } from "./CharacterAvatar";
+import { voiceChatService } from "../../services/webrtc";
 
 interface RemotePlayerProps {
   player: PlayerState;
+  isSpeaking: boolean;
 }
 
-function RemotePlayer({ player }: RemotePlayerProps) {
+function RemotePlayer({ player, isSpeaking }: RemotePlayerProps) {
   const groupRef = useRef<THREE.Group>(null);
 
   useFrame(() => {
@@ -37,6 +39,7 @@ function RemotePlayer({ player }: RemotePlayerProps) {
         isLocal={false}
         isAlive={player.isAlive}
         isHost={player.isHost}
+        isSpeaking={isSpeaking}
         animationState={player.animationState || "idle"}
       />
     </group>
@@ -49,13 +52,28 @@ interface RemotePlayersProps {
 }
 
 export function RemotePlayers({ players, localSessionId }: RemotePlayersProps) {
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const unsub = voiceChatService.subscribe(() => {
+      setTick((t) => t + 1);
+    });
+    return unsub;
+  }, []);
+
   const remoteList = players.filter((p) => p.id !== localSessionId);
 
   return (
     <group>
       {remoteList.map((player) => (
-        <RemotePlayer key={player.id} player={player} />
+        <RemotePlayer
+          key={player.id}
+          player={player}
+          isSpeaking={voiceChatService.isPeerSpeaking(player.id)}
+        />
       ))}
     </group>
   );
 }
+
+

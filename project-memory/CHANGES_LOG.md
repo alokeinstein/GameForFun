@@ -2,6 +2,12 @@
 
 ## 2026-11-03
 
+- Added: Procedural Web Audio API sound synthesizer (`apps/web/src/services/audio.ts`) generating phase transition cues (dawn bell, night drone, tribunal gavel, doom toll, victory fanfare), urgent 10s countdown ticks, vote confirm taps, and UI click feedback with zero asset downloads.
+- Added: WebRTC proximity voice chat client (`apps/web/src/services/webrtc.ts`) with peer mesh connection over STUN, Colyseus room signaling (`VOICE_SIGNAL`), Voice Activity Detection (VAD), and mic mute toggle (`M` hotkey).
+- Added: 3D spatial audio distance attenuation calculating dynamic gain via Euclidean distance in town square ($d = \sqrt{\Delta x^2 + \Delta z^2}$) with quadratic falloff.
+- Added: Authoritative dead player voice isolation in `MafiaRoom.ts` preventing eliminated players from transmitting voice signals to living players during active rounds.
+- Added: Animated visual speaking indicators including pulsating green ground rings on `CharacterAvatar.tsx` and glowing mic icons on player roster cards in `GameHUD.tsx`.
+- Added: Automated integration test suite `apps/game-server/tests/VoiceSignaling.test.ts` verifying signaling relay, voice state broadcasting, and dead player channel isolation (all passing).
 - Added: Stylized low-poly Town Square 3D map (`TownMap.tsx`) with central tribunal circle, stone benches, perimeter buildings, streetlamps, and dynamic Day/Night lighting and fog.
 - Added: Stylized Deadshot.io-style humanoid character avatars (`CharacterAvatar.tsx`) with floating HTML name tags, ghost mode for dead players, and procedural walking/running limb animations.
 - Added: Rapier WASM physics kinematic character controller (`CharacterController.tsx`) with WASD movement, Shift sprint, and smooth third-person follow camera.

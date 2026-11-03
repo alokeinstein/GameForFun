@@ -10,6 +10,7 @@ interface CharacterAvatarProps {
   isLocal?: boolean;
   isAlive?: boolean;
   isHost?: boolean;
+  isSpeaking?: boolean;
   animationState?: string;
   color?: string;
 }
@@ -19,6 +20,7 @@ export function CharacterAvatar({
   isLocal = false,
   isAlive = true,
   isHost = false,
+  isSpeaking = false,
   animationState = "idle",
   color
 }: CharacterAvatarProps) {
@@ -62,16 +64,27 @@ export function CharacterAvatar({
       {/* Floating Name Tag */}
       <Html position={[0, 2.35, 0]} center distanceFactor={14}>
         <div className="flex flex-col items-center pointer-events-none select-none">
-          <div className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-noir-950/80 border border-noir-700/80 shadow-lg text-[11px] font-bold font-mono tracking-wide text-white whitespace-nowrap">
+          <div className={`flex items-center space-x-1 px-2 py-0.5 rounded-full bg-noir-950/80 border shadow-lg text-[11px] font-bold font-mono tracking-wide text-white whitespace-nowrap transition-colors ${
+            isSpeaking ? "border-emerald-500 ring-2 ring-emerald-500/40" : "border-noir-700/80"
+          }`}>
             {isHost && <span className="text-amber-400">👑</span>}
             <span className={isLocal ? "text-blue-400" : isAlive ? "text-white" : "text-noir-400"}>
               {displayName}
             </span>
             {isLocal && <span className="text-[9px] text-blue-300 ml-0.5">(You)</span>}
+            {isSpeaking && <span className="text-[10px] text-emerald-400 animate-pulse ml-0.5">🎙️</span>}
             {!isAlive && <span className="text-[9px] text-rose-400 ml-0.5">💀</span>}
           </div>
         </div>
       </Html>
+
+      {/* Speaking Sound Ring */}
+      {isSpeaking && isAlive && (
+        <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.62, 0.78, 32]} />
+          <meshBasicMaterial color="#22c55e" transparent opacity={0.85} />
+        </mesh>
+      )}
 
       {/* Local Player Selection Ring */}
       {isLocal && isAlive && (
@@ -193,3 +206,4 @@ export function CharacterAvatar({
     </group>
   );
 }
+

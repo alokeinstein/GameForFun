@@ -1,7 +1,7 @@
 "use client";
 
 import React, { Suspense } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import { Room } from "colyseus.js";
@@ -9,6 +9,14 @@ import { MafiaRoomState, PlayerState } from "@mafia/shared";
 import { TownMap } from "./TownMap";
 import { CharacterController } from "./CharacterController";
 import { RemotePlayers } from "./RemotePlayers";
+import { voiceChatService } from "../../services/webrtc";
+
+function SpatialAudioUpdater() {
+  useFrame(() => {
+    voiceChatService.updateSpatialAudio();
+  });
+  return null;
+}
 
 interface GameSceneProps {
   room: Room<MafiaRoomState>;
@@ -37,6 +45,7 @@ export function GameScene({
         gl={{ antialias: true, powerPreference: "high-performance" }}
       >
         <Suspense fallback={null}>
+          <SpatialAudioUpdater />
           <Physics gravity={[0, -16, 0]}>
             {/* Town Square 3D Map */}
             <TownMap phase={phase} />
@@ -66,3 +75,4 @@ export function GameScene({
     </div>
   );
 }
+

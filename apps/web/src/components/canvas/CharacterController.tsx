@@ -7,6 +7,7 @@ import { RigidBody, RapierRigidBody, CapsuleCollider } from "@react-three/rapier
 import { Room } from "colyseus.js";
 import { ClientMessageType, MafiaRoomState, PlayerState } from "@mafia/shared";
 import { CharacterAvatar } from "./CharacterAvatar";
+import { voiceChatService } from "../../services/webrtc";
 
 interface CharacterControllerProps {
   room: Room<MafiaRoomState>;
@@ -19,6 +20,14 @@ export function CharacterController({ room, player, isHost = false }: CharacterC
   const avatarGroupRef = useRef<THREE.Group>(null);
 
   const [animationState, setAnimationState] = useState<"idle" | "walk" | "run">("idle");
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  useEffect(() => {
+    const unsub = voiceChatService.subscribe(() => {
+      setIsSpeaking(voiceChatService.getIsSpeaking() && !voiceChatService.getIsMuted());
+    });
+    return unsub;
+  }, []);
 
   // Keyboard state
   const keys = useRef<{
@@ -223,9 +232,11 @@ export function CharacterController({ room, player, isHost = false }: CharacterC
           isLocal={true}
           isAlive={player.isAlive}
           isHost={isHost}
+          isSpeaking={isSpeaking}
           animationState={animationState}
         />
       </group>
     </RigidBody>
   );
 }
+

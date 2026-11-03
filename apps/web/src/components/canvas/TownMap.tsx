@@ -229,3 +229,4 @@ export function TownMap({ phase }: TownMapProps) {
     </group>
   );
 }
+

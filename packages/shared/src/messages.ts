@@ -12,7 +12,9 @@ export enum ClientMessageType {
   MAFIA_TARGET_VOTE = "MAFIA_TARGET_VOTE",
   SEND_CHAT = "SEND_CHAT",
   RECONNECT_SESSION = "RECONNECT_SESSION",
-  RESET_TO_LOBBY = "RESET_TO_LOBBY"
+  RESET_TO_LOBBY = "RESET_TO_LOBBY",
+  VOICE_SIGNAL = "VOICE_SIGNAL",
+  VOICE_STATE = "VOICE_STATE"
 }
 
 /**
@@ -25,7 +27,9 @@ export enum ServerMessageType {
   RECONNECTION_TOKEN = "RECONNECTION_TOKEN",   // PRIVATE
   CHAT_MESSAGE = "CHAT_MESSAGE",
   SYSTEM_NOTIFICATION = "SYSTEM_NOTIFICATION",
-  ERROR_NOTIFICATION = "ERROR_NOTIFICATION"
+  ERROR_NOTIFICATION = "ERROR_NOTIFICATION",
+  VOICE_SIGNAL = "VOICE_SIGNAL",
+  VOICE_STATE = "VOICE_STATE"
 }
 
 export interface PlayerTransformPayload {
@@ -49,3 +53,18 @@ export interface ChatMessagePayload {
   timestamp: number;
 }
 
+export interface VoiceSignalPayload {
+  targetSessionId: string;
+  signal: any;
+}
+
+export interface VoiceSignalRelayPayload {
+  fromSessionId: string;
+  signal: any;
+}
+
+export interface VoiceStatePayload {
+  sessionId: string;
+  isMuted: boolean;
+  isSpeaking: boolean;
+}

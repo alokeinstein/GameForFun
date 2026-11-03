@@ -101,3 +101,21 @@
 - **Decision:** Build the 3D game layer using React Three Fiber (`@react-three/fiber`), Drei helpers, and Rapier WASM physics (`@react-three/rapier`), adopting a flat-shaded stylized low-poly aesthetic (Deadshot.io style).
 - **Reason:** R3F integrates seamlessly with Next.js 14 and React state; Rapier WebAssembly physics avoids garbage-collection frame drops; low-poly geometries require zero texture downloads, load in < 1 second, and achieve 60+ FPS on all devices.
 - **Impact:** Eliminates heavy 3D asset overhead and guarantees instant web accessibility.
+
+---
+
+### DEC-012: Procedural Web Audio API Sound Synthesis
+- **Date:** 2026-11-03
+- **Area:** Audio / Frontend
+- **Decision:** Synthesize all ambient sounds and phase transition audio cues mathematically using the browser's native `AudioContext` (oscillators, envelopes, biquad filters) rather than loading static `.mp3` or `.wav` files.
+- **Reason:** Static audio files introduce network latency, 404/CORS failure risks, asset bundle bloat, and cache busting hurdles. Procedural synthesis guarantees instant playback with zero bandwidth consumption and 100% offline reliability.
+- **Impact:** `apps/web/src/services/audio.ts` provides instant auditory cues (dawn bell, night drone, tribunal gavel, urgent countdown ticks) with master volume and mute controls persisted in localStorage.
+
+---
+
+### DEC-013: WebRTC Proximity Voice Mesh with Authoritative Dead Channel Isolation
+- **Date:** 2026-11-03
+- **Area:** Networking / Audio / Gameplay Integrity
+- **Decision:** Implement peer-to-peer proximity voice chat using browser WebRTC peer connections signaled directly through the authoritative Colyseus room (`VOICE_SIGNAL`), with distance attenuation calculated dynamically in 3D and dead player voice isolation enforced at both the server signaling layer and client audio gain layer.
+- **Reason:** Eliminates the need for a separate third-party voice signaling server; spatial quadratic distance falloff replicates realistic in-person social deduction; strict server-side dropping of voice signals from eliminated players prevents dead players from spoiling secret roles or communicating outside their spectator channel.
+- **Impact:** Delivers immersive, tamper-proof proximity audio with visual speaking indicators on 3D character avatars and player cards.

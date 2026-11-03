@@ -126,17 +126,19 @@
 
 ---
 
-## 5. Audio & Social Communication
+## 5. Audio & Social Communication (Milestone 4)
 
-### Feature: Ambient & Game Event Sound Effects
-- **Status:** Planned
-- **Purpose:** Heighten tension and communicate phase transitions audibly.
-- **Behaviour:** Clock ticks, dawn rooster/bell, night crickets, voting gavel, and victory stings.
+### Feature: Procedural Web Audio API Sound Synthesizer
+- **Status:** Implemented
+- **Purpose:** Zero-asset audio cues for heightened tension, phase changes, and instant tactile feedback.
+- **Behaviour:** Pure mathematical audio generation via AudioContext oscillators and filters. Features dawn church bell, nightfall drone, tribunal gavel strike, doom toll, urgent clock ticks (last 10s), vote confirmations, and victory fanfare.
+- **Important notes:** Zero MP3/WAV downloads; master volume and mute state persisted in localStorage.
 
-### Feature: Spatial / Proximity Voice Chat
-- **Status:** Planned
-- **Purpose:** Immersive social-deduction debate using spatial WebRTC audio.
-- **Behaviour:** Players hear nearby players clearly; dead players are muted from living players during active rounds.
+### Feature: WebRTC Proximity Voice Chat & Spatial Attenuation
+- **Status:** Implemented
+- **Purpose:** Immersive social-deduction debate using real-time browser microphone audio.
+- **Behaviour:** Peer connection mesh signaled through Colyseus (`VOICE_SIGNAL`). Distance attenuation calculated dynamically in 3D town square ($d = \sqrt{\Delta x^2 + \Delta z^2}$, max 30m). Includes mic mute toggle (`M` shortcut), Voice Activity Detection (VAD), and visual speaking rings on avatars.
+- **Important notes:** Strict server-enforced dead channel: dead players cannot transmit audio signals to living players during active rounds.
 
 ---
 

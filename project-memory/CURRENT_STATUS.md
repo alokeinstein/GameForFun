@@ -1,7 +1,7 @@
 # Current Development Status
 
 ## Active Milestone
-**Milestone 4: Positional WebRTC Audio & Social Atmosphere**
+**Milestone 5: Match History Persistence, Player Statistics & Production Polish**
 
 ---
 
@@ -21,34 +21,41 @@
   - Automated integration test suite in `apps/game-server/tests/GameLoop.test.ts` (all 8 room tests passing).
   - Comprehensive 2D In-Game HUD (`apps/web/src/components/game/GameHUD.tsx`) with role dossiers, night assassination panel, voting matrix, and post-game reveal.
   - Host "Return to Lobby" rematch reset handler.
-- **Milestone 3: 3D Environment, Low-Poly Map & Synced Character Controller** (Verified & In Review)
+- **Milestone 3: 3D Environment, Low-Poly Map & Synced Character Controller** (Commit `5e62d1f`)
   - Installed React Three Fiber (`@react-three/fiber`), Drei (`@react-three/drei`), Rapier physics (`@react-three/rapier`), and Three.js.
   - Built stylized low-poly Town Square map (`TownMap.tsx`) with central tribunal circle, benches, surrounding buildings, streetlamps, and dynamic Day/Night lighting and fog.
   - Built stylized Deadshot.io-style humanoid character avatars (`CharacterAvatar.tsx`) with floating HTML nameplates and procedural walking/running limb animations.
   - Built Rapier WASM physics kinematic character controller (`CharacterController.tsx`) with WASD movement, Shift sprint, and smooth third-person follow camera.
   - Implemented 20 Hz player transform network synchronization with client-side linear interpolation (`RemotePlayers.tsx`).
   - Integrated 3D canvas behind the 2D Game HUD with one-click view toggling (`[3D Town View / Dossier View]`) and floating in-game widgets.
+- **Milestone 4: Positional WebRTC Audio & Social Atmosphere** (Verified & Completed)
+  - Implemented procedural Web Audio API sound effects (`apps/web/src/services/audio.ts`): zero asset downloads, dawn bell, nightfall drone, tribunal gavel strike, doom toll, urgent 10s clock tick, vote confirmations, and victory fanfare.
+  - Implemented WebRTC proximity voice chat (`apps/web/src/services/webrtc.ts`): peer mesh with STUN servers, Colyseus room signaling (`VOICE_SIGNAL`), Voice Activity Detection (VAD), and mic mute toggle (`M` hotkey).
+  - 3D spatial attenuation: dynamic gain calculation based on Euclidean distance in town square with quadratic falloff.
+  - Strict dead player voice isolation: server authoritatively drops voice signals from eliminated players to living players during active rounds.
+  - Visual speaking indicators: animated green rings at feet on 3D character avatars and glowing microphone badges on player roster cards.
+  - Integration test suite in `apps/game-server/tests/VoiceSignaling.test.ts` (all 3 voice signaling tests passing).
 
 ---
 
 ## Features Currently in Progress
-- Preparing Milestone 4: Sound effects & WebRTC proximity voice chat architecture.
+- Milestone 5 planning: match history persistence and database synchronization.
 
 ---
 
 ## Known Bugs & Blockers
 - **None.** Monorepo health is pristine:
-  - 46/46 automated tests passing across `@mafia/game-rules` and `@mafia/game-server`.
+  - 49/49 automated tests passing across `@mafia/game-rules` (38) and `@mafia/game-server` (11).
   - Turborepo typecheck passing across all 5 workspace packages.
   - Next.js production build (`next build`) passing cleanly.
 
 ---
 
 ## Important Incomplete Work
-1. **Audio & Social:** Sound effects and WebRTC proximity voice (Milestone 4).
-2. **Database Match Archival:** Connecting post-game summaries to PostgreSQL via Prisma (Milestone 5).
+1. **Database Match Archival:** Connecting post-game summaries to PostgreSQL via Prisma (Milestone 5).
+2. **Player Accounts & Historical Statistics:** Tracking matches won, roles played, and survival rates.
 
 ---
 
 ## Last Meaningful Checkpoint
-- **Milestone 3 Completed**: 3D Town Square, Rapier character controller, and 20 Hz transform sync verified with production Next.js build and 46/46 tests passing.
+- **Milestone 4 Completed**: Procedural Web Audio SFX, WebRTC proximity voice chat, spatial distance attenuation, dead player acoustic isolation, and speaking indicators verified with production Next.js build and 49/49 tests passing.

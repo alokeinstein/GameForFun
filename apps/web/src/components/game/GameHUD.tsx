@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { Room } from "colyseus.js";
 import {
   Phase,
@@ -33,9 +33,15 @@ import {
   Ghost,
   Boxes,
   LayoutDashboard,
-  Compass
+  Compass,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX
 } from "lucide-react";
 import dynamic from "next/dynamic";
+import { audioManager } from "../../services/audio";
+import { voiceChatService } from "../../services/webrtc";
 
 const GameScene = dynamic(
   () => import("../canvas/GameScene").then((mod) => mod.GameScene),
@@ -193,9 +199,63 @@ export function GameHUD({
   const [viewMode, setViewMode] = useState<"3d" | "hud">("3d");
   const [isChatOpen, setIsChatOpen] = useState(true);
 
+  // --- Audio & WebRTC Voice State ---
+  const [isMicMuted, setIsMicMuted] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [sfxMuted, setSfxMuted] = useState(false);
+  const [sfxVolume, setSfxVolume] = useState(0.7);
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const [, setVoiceTick] = useState(0);
+
   // --- Authoritative Countdown Sync ---
   const [secondsRemaining, setSecondsRemaining] = useState<number>(0);
   const [progressPercent, setProgressPercent] = useState<number>(0);
+  const lastTickSecRef = useRef<number>(-1);
+
+  // Initialize Voice Chat and Audio Subscriptions
+  useEffect(() => {
+    if (!room) return;
+
+    voiceChatService.init(room).catch((err) => {
+      console.warn("Failed to initialize voice chat:", err);
+    });
+
+    setIsMicMuted(voiceChatService.getIsMuted());
+    setIsSpeaking(voiceChatService.getIsSpeaking());
+    setSfxMuted(audioManager.isMuted());
+    setSfxVolume(audioManager.getVolume());
+
+    const unsubVoice = voiceChatService.subscribe(() => {
+      setIsMicMuted(voiceChatService.getIsMuted());
+      setIsSpeaking(voiceChatService.getIsSpeaking());
+      setVoiceTick((t) => t + 1);
+    });
+
+    const unsubAudio = audioManager.subscribe(() => {
+      setSfxMuted(audioManager.isMuted());
+      setSfxVolume(audioManager.getVolume());
+    });
+
+    return () => {
+      unsubVoice();
+      unsubAudio();
+      voiceChatService.cleanup();
+    };
+  }, [room]);
+
+  // Global keybind for Mic Toggle (M key)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === "m" || e.key === "M") {
+        e.preventDefault();
+        const muted = voiceChatService.toggleMute();
+        setIsMicMuted(muted);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Self player
   const me = useMemo(() => {
@@ -226,7 +286,7 @@ export function GameHUD({
     return Math.ceil(livingPlayers.length * 0.5);
   }, [livingPlayers.length]);
 
-  // Timer loop
+  // Timer loop with urgent clock ticks
   useEffect(() => {
     const updateClock = () => {
       const now = Date.now();
@@ -237,17 +297,30 @@ export function GameHUD({
       const elapsed = Math.max(0, now - phaseStartedAt);
       const pct = Math.min(100, Math.max(0, (elapsed / total) * 100));
       setProgressPercent(pct);
+
+      // Play clock tick for final 10 seconds of active debate / voting
+      if (
+        remaining <= 10 &&
+        remaining > 0 &&
+        remaining !== lastTickSecRef.current &&
+        (phase === Phase.DAY_DISCUSSION || phase === Phase.DAY_VOTING || phase === Phase.REVOTING)
+      ) {
+        lastTickSecRef.current = remaining;
+        audioManager.playClockTick(remaining <= 4);
+      }
     };
 
     updateClock();
     const interval = setInterval(updateClock, 200);
     return () => clearInterval(interval);
-  }, [phaseStartedAt, phaseEndsAt]);
+  }, [phaseStartedAt, phaseEndsAt, phase]);
 
-  // Reset phase-specific selections on phase change
+  // Reset phase-specific selections and play phase audio sting on phase change
   useEffect(() => {
     setSelectedTargetId(null);
     setHasVoted(false);
+    audioManager.playPhaseTransition(phase as Phase);
+
     if (phase === Phase.ROLE_ASSIGNMENT) {
       setShowRoleModal(true);
       setRoleRevealedInModal(false);
@@ -306,12 +379,14 @@ export function GameHUD({
   // Handlers
   const handleMafiaTargetVote = (targetId: string) => {
     if (!room || !isAlive || myRole !== Role.MAFIA || phase !== Phase.NIGHT) return;
+    audioManager.playVoteConfirm();
     setSelectedTargetId(targetId);
     room.send(ClientMessageType.MAFIA_TARGET_VOTE, { targetId });
   };
 
   const handleCastDayVote = (targetId: string) => {
     if (!room || !isAlive || (phase !== Phase.DAY_VOTING && phase !== Phase.REVOTING)) return;
+    audioManager.playVoteConfirm();
     setSelectedTargetId(targetId);
     setHasVoted(true);
     room.send(ClientMessageType.CAST_VOTE, { targetId });
@@ -510,6 +585,72 @@ export function GameHUD({
                 </>
               )}
             </button>
+
+            {/* WebRTC Voice Chat Controls */}
+            <button
+              onClick={() => {
+                const muted = voiceChatService.toggleMute();
+                setIsMicMuted(muted);
+              }}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border transition pointer-events-auto shadow-sm text-xs font-mono font-bold ${
+                isMicMuted
+                  ? "bg-rose-950/40 border-rose-800/80 text-rose-400 hover:bg-rose-900/50"
+                  : isSpeaking
+                  ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 ring-2 ring-emerald-500/50 animate-pulse"
+                  : "bg-noir-800/90 border-noir-700 text-emerald-400 hover:bg-noir-700"
+              }`}
+              title={isMicMuted ? "Unmute Microphone (Key: M)" : "Mute Microphone (Key: M)"}
+            >
+              {isMicMuted ? <MicOff className="w-3.5 h-3.5 text-rose-400" /> : <Mic className="w-3.5 h-3.5 text-emerald-400" />}
+              <span className="hidden sm:inline">{isMicMuted ? "Muted" : isSpeaking ? "Speaking" : "Mic"}</span>
+              <span className="text-[9px] text-noir-400 bg-noir-900/80 px-1 py-0.5 rounded border border-noir-700 ml-0.5">M</span>
+            </button>
+
+            {/* Procedural Audio SFX Controls */}
+            <div className="relative pointer-events-auto flex items-center">
+              <button
+                onClick={() => {
+                  const muted = audioManager.toggleMute();
+                  setSfxMuted(muted);
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setShowVolumeSlider(!showVolumeSlider);
+                }}
+                className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border transition shadow-sm text-xs font-mono font-bold ${
+                  sfxMuted
+                    ? "bg-noir-900 border-noir-800 text-noir-500 hover:text-noir-300"
+                    : "bg-noir-800/90 border-noir-700 text-amber-400 hover:bg-noir-700"
+                }`}
+                title={sfxMuted ? "Unmute Sound Effects (Right click for volume)" : "Mute Sound Effects (Right click for volume)"}
+              >
+                {sfxMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+              </button>
+
+              {showVolumeSlider && (
+                <div className="absolute right-0 top-10 bg-noir-950/95 border border-noir-800 p-3 rounded-xl shadow-2xl z-50 flex items-center space-x-2">
+                  <Volume2 className="w-3.5 h-3.5 text-noir-400" />
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={sfxMuted ? 0 : sfxVolume}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      audioManager.setVolume(val);
+                      if (val > 0 && sfxMuted) {
+                        audioManager.setMuted(false);
+                      }
+                    }}
+                    className="w-20 accent-amber-400 cursor-pointer"
+                  />
+                  <span className="text-[10px] font-mono text-noir-300 w-6">
+                    {Math.round(sfxVolume * 100)}%
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -524,6 +665,9 @@ export function GameHUD({
             <span className="text-noir-600">•</span>
             <span className="text-amber-400 font-bold">Shift:</span>
             <span>Sprint</span>
+            <span className="text-noir-600">•</span>
+            <span className="text-emerald-400 font-bold">M:</span>
+            <span>Mic</span>
           </div>
 
           <button
@@ -709,6 +853,9 @@ export function GameHUD({
                         {p.id === sessionId && (
                           <span className="text-[10px] text-noir-400 font-mono">(You)</span>
                         )}
+                        {(voiceChatService.isPeerSpeaking(p.id) || (p.id === sessionId && isSpeaking && !isMicMuted)) && (
+                          <Mic className="w-3 h-3 text-emerald-400 animate-pulse ml-1" />
+                        )}
                       </div>
                       <div className="text-xs font-mono">
                         {p.isAlive ? (
@@ -777,6 +924,9 @@ export function GameHUD({
                             <div className="font-bold text-sm flex items-center space-x-1.5">
                               <span>{target.displayName}</span>
                               {isSelf && <span className="text-[10px] text-noir-400">(Self)</span>}
+                              {(voiceChatService.isPeerSpeaking(target.id) || (target.id === sessionId && isSpeaking && !isMicMuted)) && (
+                                <Mic className="w-3 h-3 text-emerald-400 animate-pulse ml-1" />
+                              )}
                             </div>
                             <div className="text-[11px] text-noir-400">
                               {isSelf ? "Self-voting disabled" : "Click to eliminate"}
@@ -987,7 +1137,12 @@ export function GameHUD({
                       : "bg-noir-950 border-noir-800 hover:border-noir-700 text-white"
                   }`}
                 >
-                  <span className="truncate">{target.displayName}</span>
+                  <span className="truncate flex items-center space-x-1">
+                    <span>{target.displayName}</span>
+                    {(voiceChatService.isPeerSpeaking(target.id) || (target.id === sessionId && isSpeaking && !isMicMuted)) && (
+                      <Mic className="w-3 h-3 text-emerald-400 animate-pulse" />
+                    )}
+                  </span>
                   {isSelected && <Check className="w-3 h-3 text-white ml-1 shrink-0" />}
                 </button>
               );

@@ -24,6 +24,7 @@ import {
   PlayerTransformPayload,
   TICK_INTERVAL_MS,
   ChatMessagePayload,
+  VoiceSignalPayload,
   MafiaRoomState,
   PlayerState
 } from "@mafia/shared";
@@ -335,6 +336,47 @@ export class MafiaRoom extends Room<MafiaRoomState> {
 
       this.broadcast(ServerMessageType.SYSTEM_NOTIFICATION, {
         message: "The host has returned the room to the lobby. Ready up for the next match!"
+      });
+    });
+
+    // 8. WebRTC Proximity Voice Signaling
+    this.onMessage(ClientMessageType.VOICE_SIGNAL, (client, data: VoiceSignalPayload) => {
+      if (!data || !data.targetSessionId || !data.signal) return;
+
+      const sender = this.state.players.get(client.sessionId);
+      const target = this.state.players.get(data.targetSessionId);
+      if (!sender || !target) return;
+
+      // Enforce dead player channel isolation during active rounds:
+      // If the sender is eliminated and the target is living, do NOT forward voice signals.
+      // Dead players cannot transmit to living players during active gameplay.
+      const isMatchActive =
+        this.state.phase !== Phase.WAITING_FOR_PLAYERS &&
+        this.state.phase !== Phase.VICTORY;
+
+      if (isMatchActive && !sender.isAlive && target.isAlive) {
+        return; // Dropped to preserve competitive integrity
+      }
+
+      // Find target client connection
+      const targetClient = this.clients.find((c) => c.sessionId === data.targetSessionId);
+      if (targetClient) {
+        targetClient.send(ServerMessageType.VOICE_SIGNAL, {
+          fromSessionId: client.sessionId,
+          signal: data.signal
+        });
+      }
+    });
+
+    // 9. Voice State (Muted / Speaking indicator)
+    this.onMessage(ClientMessageType.VOICE_STATE, (client, data: { isMuted?: boolean; isSpeaking?: boolean }) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+
+      this.broadcast(ServerMessageType.VOICE_STATE, {
+        sessionId: client.sessionId,
+        isMuted: Boolean(data.isMuted),
+        isSpeaking: Boolean(data.isSpeaking)
       });
     });
   }

@@ -1,43 +1,46 @@
 # Next Steps
 
 ## Current Immediate Task
-**Milestone 4: Positional WebRTC Audio & Social Atmosphere**
-Implement ambient sound effects, phase transition audio cues, and WebRTC proximity voice chat architecture.
+**Milestone 5: Match History Persistence, Player Statistics & Production Polish**
+Implement Prisma-backed PostgreSQL match recording on victory, player career statistics updates, and production deployment readiness.
 
 ---
 
-## Remaining Tasks in Current Milestone (Milestone 4)
-1. **Audio Manager & Sound Effects (`apps/web/src/services/audio.ts`):**
-   - Synthesized / web-audio cues for clock ticks, dawn bells, night crickets, tribunal gavel, and victory stings.
-   - Master volume and mute toggles in game settings.
-2. **WebRTC Proximity Voice Signaling:**
-   - Colyseus room signaling for WebRTC peer connection offer/answer/ICE exchange.
-   - Spatial audio gain nodes based on Euclidean distance in 3D town square ($d = \sqrt{\Delta x^2 + \Delta z^2}$).
-3. **Dead Player Voice Isolation:**
-   - Dead players cannot speak to living players during active rounds (spectator dead channel).
+## Remaining Tasks in Current Milestone (Milestone 5)
+1. **Match Archival Service in `apps/game-server`:**
+   - Instantiate Prisma client from `@mafia/database`.
+   - On transition to `Phase.VICTORY`, record `GameSession` (room code, winner, duration, rounds).
+   - Record `GamePlayer` records for each participant (role, survival status, eliminated by).
+   - Asynchronously update or upsert `PlayerStats` (wins, losses, survival rates).
+2. **Match History API & Web Viewer:**
+   - Add endpoint or room message to fetch past match records.
+   - Display match summary breakdown in the post-game screen.
+3. **End-to-End Stress Testing & Health Verification:**
+   - Full automated test suite across all milestones (50+ tests).
+   - Production Docker / container verification for Colyseus and Next.js.
 
 ---
 
 ## Task Dependencies
 ```
-[Web Audio SFX Manager]
+[Milestone 4: WebRTC Voice & Web Audio SFX] (COMPLETED)
         │
         ▼
-[Colyseus WebRTC Voice Signaling]
+[Prisma Match Archival Service]
         │
         ▼
-[Spatial 3D Distance Attenuation]
+[Player Career Statistics Upsert]
         │
         ▼
-[Dead Player Channel Isolation]
+[Production Deployment Verification]
 ```
 
 ---
 
 ## Blockers
-- **None.** Monorepo health is pristine (46/46 tests passing).
+- **None.** Monorepo health is pristine (49/49 tests passing, production build passing).
 
 ---
 
 ## Suggested Next Action
-Implement `apps/web/src/services/audio.ts` with procedural Web Audio API phase stings and UI audio feedback.
+Implement the Prisma match archival handler in `apps/game-server/src/rooms/MafiaRoom.ts` triggering on `Phase.VICTORY`.
