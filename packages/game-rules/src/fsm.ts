@@ -75,3 +75,4 @@ export function getNextPhaseAfterRevote(
   // Revote failed to achieve >= 50%; proceed to night
   return Phase.NIGHT;
 }
+

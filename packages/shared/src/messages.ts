@@ -47,3 +47,4 @@ export interface ChatMessagePayload {
   message: string;
   timestamp: number;
 }
+

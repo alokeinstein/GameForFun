@@ -92,3 +92,4 @@ describe("State Machine & Transition Rules", () => {
     expect(nextPhase).toBe(Phase.NIGHT);
   });
 });
+

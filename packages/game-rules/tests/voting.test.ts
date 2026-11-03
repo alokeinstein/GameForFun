@@ -151,3 +151,4 @@ describe("Public Voting & 50% Threshold Rules", () => {
     expect(tally.candidateVotes["p3"]).toBeUndefined();
   });
 });
+

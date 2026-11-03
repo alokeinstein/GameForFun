@@ -129,3 +129,4 @@ model PlayerStats {
   ```bash
   npm run db:migrate
   ```
+

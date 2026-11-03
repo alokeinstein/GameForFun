@@ -89,3 +89,4 @@ describe("Mafia Night Voting & Target Selection Rules", () => {
     expect(result.totalVotesCast).toBe(0);
   });
 });
+

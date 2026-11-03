@@ -97,3 +97,4 @@ model PlayerStats {
   timesEliminated Int          @default(0)
   timesSurvived   Int          @default(0)
 }
+

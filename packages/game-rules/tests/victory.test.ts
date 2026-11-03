@@ -50,3 +50,4 @@ describe("Victory Condition Rules", () => {
     expect(() => checkVictory(1, -2)).toThrow(/Invalid player counts/);
   });
 });
+

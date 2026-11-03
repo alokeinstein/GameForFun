@@ -5,15 +5,27 @@
   "main": "./dist/index.js",
   "scripts": {
     "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc && node dist/index.js",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@colyseus/schema": "^2.0.36",
+    "@colyseus/ws-transport": "^0.15.3",
     "@mafia/database": "*",
     "@mafia/game-rules": "*",
-    "@mafia/shared": "*"
+    "@mafia/shared": "*",
+    "colyseus": "0.15.57",
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
     "@types/node": "^22.13.9",
-    "typescript": "^5.8.2"
+    "colyseus.js": "^0.15.28",
+    "typescript": "^5.8.2",
+    "vitest": "^3.2.7"
   }
 }

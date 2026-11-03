@@ -167,3 +167,4 @@ The game lifecycle is governed by a strict, server-authoritative finite state ma
   * Open post-game voice channel to all players (living + dead).
 * **Allowed Actions:** View match statistics, chat, return to lobby (host).
 * **Exit Trigger:** Host triggers return to lobby or players disconnect.
+

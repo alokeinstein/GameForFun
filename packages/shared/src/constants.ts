@@ -20,3 +20,4 @@ export const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // No 0, O
 
 export const TICK_RATE_HZ = 20;
 export const TICK_INTERVAL_MS = 1000 / TICK_RATE_HZ; // 50ms
+

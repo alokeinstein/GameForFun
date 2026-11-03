@@ -51,3 +51,4 @@ This document tracks unresolved product and gameplay questions. Each item includ
 * **Engineering Recommendation:** **Option 1 (Voice + Text for dead players).**
 * **Rationale:** Watching friends play while chatting in spectator "ghost chat" is one of the most entertaining aspects of Among Us and Mafia.
 * **Status:** Targeted for Milestone 4 (Voice implementation).
+

@@ -83,3 +83,4 @@ While physics and movement are client-predicted for silky 60fps responsiveness, 
 2. If the socket drops, the player is marked `isConnected = false`, and a **60-second grace timer** begins.
 3. To reconnect, the client presents the `reconnectionToken`. The server reattaches the existing `PlayerState` and socket without creating duplicate players or resetting role assignments.
 4. Tokens are invalidated upon game conclusion or after the 60-second timeout expires.
+

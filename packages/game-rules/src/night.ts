@@ -82,3 +82,4 @@ export function countNightMafiaVotes(options: CountNightVotesOptions): NightKill
     totalVotesCast
   };
 }
+

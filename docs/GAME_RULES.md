@@ -127,3 +127,4 @@ Citizens win immediately when the last Mafia member is eliminated.
 ### 8.2 Mafia Victory
 $$\text{Living Mafia Count} \ge \text{Living Citizen Count}$$
 Mafia wins immediately when living Mafia achieve numerical parity or a majority over living Citizens, as Citizens can no longer mathematically reach a 50% majority in public voting.
+

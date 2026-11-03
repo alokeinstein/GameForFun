@@ -85,3 +85,4 @@ describe("Role Distribution & Count Rules", () => {
     expect(hostRoles.has(Role.CITIZEN)).toBe(true);
   });
 });
+

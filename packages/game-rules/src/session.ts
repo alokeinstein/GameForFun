@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import { ReconnectionSession } from "./types.js";
 
 export const DEFAULT_RECONNECT_GRACE_SEC = 60;
@@ -13,7 +12,7 @@ export function createReconnectionSession(
 ): ReconnectionSession {
   // Generate cryptographically secure token
   const randomBytes = new Uint8Array(16);
-  crypto.getRandomValues(randomBytes);
+  globalThis.crypto.getRandomValues(randomBytes);
   const token = Array.from(randomBytes)
     .map(b => b.toString(16).padStart(2, "0"))
     .join("");

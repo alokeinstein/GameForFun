@@ -73,3 +73,4 @@ The repository uses an **npm workspaces** monorepo orchestrated with **Turborepo
 - Transient gameplay state (player coordinates, voting tallies, tick timers) lives in memory on the game server.
 - PostgreSQL stores user accounts, match summaries, aggregated statistics, and post-game event logs.
 - Match history records do not expose secret roles to public client queries while a match is in progress.
+

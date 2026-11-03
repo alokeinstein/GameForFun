@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import { Role } from "./types.js";
 
 export const MIN_PLAYERS_PRODUCTION = 5;
@@ -88,7 +87,7 @@ export function secureShuffle<T>(array: T[]): T[] {
   for (let i = result.length - 1; i > 0; i--) {
     // Generate secure random integer in range [0, i]
     const randomBuffer = new Uint32Array(1);
-    crypto.getRandomValues(randomBuffer);
+    globalThis.crypto.getRandomValues(randomBuffer);
     const j = randomBuffer[0] % (i + 1);
     [result[i], result[j]] = [result[j], result[i]];
   }

@@ -96,3 +96,4 @@ export function resolveRunoffCandidates(tally: VoteTallyResult): string[] {
   }
   return [];
 }
+

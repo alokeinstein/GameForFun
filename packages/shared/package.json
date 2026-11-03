@@ -16,6 +16,7 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
+    "@colyseus/schema": "^2.0.37",
     "@mafia/game-rules": "*"
   },
   "devDependencies": {
@@ -23,3 +24,4 @@
     "typescript": "^5.8.2"
   }
 }
+

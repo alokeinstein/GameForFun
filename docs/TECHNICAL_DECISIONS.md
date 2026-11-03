@@ -69,3 +69,4 @@
 * **Decision:** Treat room maximum capacity as a configurable infrastructure setting rather than hardcoding an arbitrary game rule.
 * **Context:** Facilitates scaling tests and room flexibility.
 * **Outcome:** Clean separation between network capacity limits and gameplay balance.
+
