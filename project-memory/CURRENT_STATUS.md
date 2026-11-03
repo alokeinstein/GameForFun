@@ -1,7 +1,7 @@
 # Current Development Status
 
 ## Active Milestone
-**Milestone 3: 3D Environment, Low-Poly Map & Synced Character Controller**
+**Milestone 4: Positional WebRTC Audio & Social Atmosphere**
 
 ---
 
@@ -21,12 +21,18 @@
   - Automated integration test suite in `apps/game-server/tests/GameLoop.test.ts` (all 8 room tests passing).
   - Comprehensive 2D In-Game HUD (`apps/web/src/components/game/GameHUD.tsx`) with role dossiers, night assassination panel, voting matrix, and post-game reveal.
   - Host "Return to Lobby" rematch reset handler.
+- **Milestone 3: 3D Environment, Low-Poly Map & Synced Character Controller** (Verified & In Review)
+  - Installed React Three Fiber (`@react-three/fiber`), Drei (`@react-three/drei`), Rapier physics (`@react-three/rapier`), and Three.js.
+  - Built stylized low-poly Town Square map (`TownMap.tsx`) with central tribunal circle, benches, surrounding buildings, streetlamps, and dynamic Day/Night lighting and fog.
+  - Built stylized Deadshot.io-style humanoid character avatars (`CharacterAvatar.tsx`) with floating HTML nameplates and procedural walking/running limb animations.
+  - Built Rapier WASM physics kinematic character controller (`CharacterController.tsx`) with WASD movement, Shift sprint, and smooth third-person follow camera.
+  - Implemented 20 Hz player transform network synchronization with client-side linear interpolation (`RemotePlayers.tsx`).
+  - Integrated 3D canvas behind the 2D Game HUD with one-click view toggling (`[3D Town View / Dossier View]`) and floating in-game widgets.
 
 ---
 
 ## Features Currently in Progress
-- Installing 3D dependencies (`three`, `@types/three`, `@react-three/fiber`, `@react-three/drei`, `@react-three/rapier`) in `@mafia/web`.
-- Designing the low-poly Town Square 3D map canvas.
+- Preparing Milestone 4: Sound effects & WebRTC proximity voice chat architecture.
 
 ---
 
@@ -39,11 +45,10 @@
 ---
 
 ## Important Incomplete Work
-1. **3D World & Physics:** Rendering the town square map and character controllers (Milestone 3).
-2. **Audio & Social:** Sound effects and WebRTC proximity voice (Milestone 4).
-3. **Database Match Archival:** Connecting post-game summaries to PostgreSQL via Prisma (Milestone 5).
+1. **Audio & Social:** Sound effects and WebRTC proximity voice (Milestone 4).
+2. **Database Match Archival:** Connecting post-game summaries to PostgreSQL via Prisma (Milestone 5).
 
 ---
 
 ## Last Meaningful Checkpoint
-- **Commit `85805a3`** (2026-11-03): Milestone 2 fully implemented, tested, and verified end-to-end.
+- **Milestone 3 Completed**: 3D Town Square, Rapier character controller, and 20 Hz transform sync verified with production Next.js build and 46/46 tests passing.

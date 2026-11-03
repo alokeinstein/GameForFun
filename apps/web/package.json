@@ -11,13 +11,18 @@
   "dependencies": {
     "@mafia/game-rules": "*",
     "@mafia/shared": "*",
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
+    "@react-three/rapier": "^1.5.0",
+    "@types/three": "^0.187.0",
     "clsx": "^2.1.1",
     "colyseus.js": "^0.15.28",
     "lucide-react": "^0.475.0",
     "next": "^14.2.24",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "tailwind-merge": "^3.0.2"
+    "tailwind-merge": "^3.0.2",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.9",

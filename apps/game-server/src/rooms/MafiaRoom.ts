@@ -21,6 +21,7 @@ import {
   ServerMessageType,
   ROOM_CODE_LENGTH,
   ROOM_CODE_ALPHABET,
+  PlayerTransformPayload,
   TICK_INTERVAL_MS,
   ChatMessagePayload,
   MafiaRoomState,
@@ -251,7 +252,30 @@ export class MafiaRoom extends Room<MafiaRoomState> {
       }
     });
 
-    // 6. Public / Lobby Chat
+    // 6. 3D Player Transform Input
+    this.onMessage(ClientMessageType.PLAYER_INPUT, (client, data: PlayerTransformPayload) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+
+      // Sanitize and update player transform with boundary clamping
+      if (typeof data.x === "number" && !isNaN(data.x)) {
+        player.x = Math.max(-60, Math.min(60, data.x));
+      }
+      if (typeof data.y === "number" && !isNaN(data.y)) {
+        player.y = Math.max(-5, Math.min(30, data.y));
+      }
+      if (typeof data.z === "number" && !isNaN(data.z)) {
+        player.z = Math.max(-60, Math.min(60, data.z));
+      }
+      if (typeof data.rotationY === "number" && !isNaN(data.rotationY)) {
+        player.rotationY = data.rotationY;
+      }
+      if (typeof data.animationState === "string") {
+        player.animationState = data.animationState;
+      }
+    });
+
+    // 7. Public / Lobby Chat
     this.onMessage(ClientMessageType.SEND_CHAT, (client, data: { message: string }) => {
       const player = this.state.players.get(client.sessionId);
       if (!player) return;

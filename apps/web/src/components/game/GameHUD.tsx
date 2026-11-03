@@ -30,8 +30,24 @@ import {
   Eye,
   EyeOff,
   UserCheck,
-  Ghost
+  Ghost,
+  Boxes,
+  LayoutDashboard,
+  Compass
 } from "lucide-react";
+import dynamic from "next/dynamic";
+
+const GameScene = dynamic(
+  () => import("../canvas/GameScene").then((mod) => mod.GameScene),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="absolute inset-0 bg-noir-950 flex items-center justify-center text-noir-400 font-mono text-xs">
+        Loading 3D Town Scene...
+      </div>
+    )
+  }
+);
 
 export interface ChatItem {
   id: string;
@@ -55,6 +71,93 @@ interface GameHUDProps {
   onSendChat: (msg: string) => void;
   onReturnToLobby?: () => void;
   onLeaveRoom?: () => void;
+}
+
+function ChatWidget({
+  isAlive,
+  phase,
+  chatMessages,
+  chatInput,
+  setChatInput,
+  handleChatSubmit,
+  heightClass = "h-[560px]"
+}: {
+  isAlive: boolean;
+  phase: string;
+  chatMessages: ChatItem[];
+  chatInput: string;
+  setChatInput: (val: string) => void;
+  handleChatSubmit: (e: React.FormEvent) => void;
+  heightClass?: string;
+}) {
+  return (
+    <div className={`bg-noir-900/90 backdrop-blur-md border border-noir-800 rounded-2xl flex flex-col ${heightClass} shadow-xl overflow-hidden pointer-events-auto`}>
+      <div className="p-3.5 border-b border-noir-800 bg-noir-950/60 flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <MessageSquare className="w-4 h-4 text-emerald-400" />
+          <span className="font-bold text-xs uppercase tracking-wider text-white">
+            Town Log & Chat
+          </span>
+        </div>
+        <span className="text-[10px] font-mono text-noir-400">
+          {isAlive || phase === Phase.VICTORY ? "Speech Enabled" : "Spectator Muted"}
+        </span>
+      </div>
+
+      <div className="flex-1 p-3.5 space-y-2.5 overflow-y-auto font-sans text-xs">
+        {chatMessages.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-noir-500 text-center px-4">
+            No town announcements or chats yet.
+          </div>
+        ) : (
+          chatMessages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`rounded-lg p-2.5 text-xs ${
+                msg.isSystem
+                  ? "bg-noir-950 border border-noir-800 text-amber-300 font-mono"
+                  : "bg-noir-800/60 text-noir-200"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className={`font-bold font-mono text-[11px] ${
+                  msg.isSystem ? "text-amber-400" : "text-emerald-400"
+                }`}>
+                  {msg.senderName}
+                </span>
+                <span className="text-[10px] text-noir-500 font-mono">
+                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </span>
+              </div>
+              <p className="break-words leading-relaxed">{msg.message}</p>
+            </div>
+          ))
+        )}
+      </div>
+
+      <form onSubmit={handleChatSubmit} className="p-2.5 border-t border-noir-800 bg-noir-950/80 flex space-x-2">
+        <input
+          type="text"
+          disabled={!isAlive && phase !== Phase.VICTORY}
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          placeholder={
+            isAlive || phase === Phase.VICTORY
+              ? "Send message to town..."
+              : "Eliminated players cannot speak to living players"
+          }
+          className="flex-1 bg-noir-900 border border-noir-800 rounded-xl px-3 py-2 text-xs text-white placeholder-noir-500 focus:outline-none focus:border-emerald-500 transition disabled:opacity-50"
+        />
+        <button
+          type="submit"
+          disabled={(!isAlive && phase !== Phase.VICTORY) || !chatInput.trim()}
+          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white transition flex items-center justify-center"
+        >
+          <Send className="w-3.5 h-3.5" />
+        </button>
+      </form>
+    </div>
+  );
 }
 
 export function GameHUD({
@@ -85,8 +188,10 @@ export function GameHUD({
   const [mafiaBallots, setMafiaBallots] = useState<Record<string, string>>({});
   const [mafiaVoteCounts, setMafiaVoteCounts] = useState<Record<string, number>>({});
 
-  // --- Chat & Input ---
+  // --- Chat & View Mode ---
   const [chatInput, setChatInput] = useState("");
+  const [viewMode, setViewMode] = useState<"3d" | "hud">("3d");
+  const [isChatOpen, setIsChatOpen] = useState(true);
 
   // --- Authoritative Countdown Sync ---
   const [secondsRemaining, setSecondsRemaining] = useState<number>(0);
@@ -289,9 +394,22 @@ export function GameHUD({
   }, [phase, votesRequired, winningTeam]);
 
   return (
-    <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
-      {/* 1. TOP STATUS & CLOCK HUD */}
-      <div className="bg-noir-900 border border-noir-800 rounded-2xl p-4 sm:p-5 shadow-2xl relative overflow-hidden">
+    <div className="relative w-full min-h-screen overflow-x-hidden">
+      {/* 3D Scene Layer (Fixed Background Canvas) */}
+      <GameScene
+        room={room}
+        sessionId={sessionId}
+        players={players}
+        phase={phase}
+        isHost={isHost}
+      />
+
+      {/* Floating HUD Container (Overlays 3D Scene) */}
+      <div className={`relative z-10 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6 ${
+        viewMode === "3d" ? "pointer-events-none" : "pointer-events-auto"
+      }`}>
+        {/* 1. TOP STATUS & CLOCK HUD */}
+        <div className="bg-noir-900/85 backdrop-blur-md border border-noir-800/80 rounded-2xl p-4 sm:p-5 shadow-2xl relative overflow-hidden pointer-events-auto">
         {/* Progress bar along top border */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-noir-800">
           <div
@@ -373,12 +491,55 @@ export function GameHUD({
                 </>
               )}
             </div>
+
+            {/* View Mode Switcher */}
+            <button
+              onClick={() => setViewMode(viewMode === "3d" ? "hud" : "3d")}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-noir-700 bg-noir-800/90 hover:bg-noir-700 text-xs font-mono font-bold text-white transition pointer-events-auto shadow-sm"
+              title="Toggle between 3D Town View and Dossier View"
+            >
+              {viewMode === "3d" ? (
+                <>
+                  <LayoutDashboard className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Dossier View</span>
+                </>
+              ) : (
+                <>
+                  <Boxes className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>3D Town</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>
 
+      {/* Controls Hint Pill in 3D Mode */}
+      {viewMode === "3d" && (
+        <div className="flex items-center justify-between pointer-events-none">
+          <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-noir-950/80 backdrop-blur-md border border-noir-800/80 text-noir-300 text-[11px] font-mono pointer-events-auto shadow-md">
+            <Compass className="w-3.5 h-3.5 text-blue-400" />
+            <span className="text-white font-bold">WASD:</span>
+            <span>Move</span>
+            <span className="text-noir-600">•</span>
+            <span className="text-amber-400 font-bold">Shift:</span>
+            <span>Sprint</span>
+          </div>
+
+          <button
+            onClick={() => setIsChatOpen(!isChatOpen)}
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-noir-950/80 backdrop-blur-md border border-noir-800/80 text-noir-300 hover:text-white text-[11px] font-mono pointer-events-auto transition shadow-md"
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{isChatOpen ? "Hide Chat" : "Show Chat"}</span>
+          </button>
+        </div>
+      )}
+
       {/* 2. MAIN INTERACTIVE STAGE & CHAT LAYOUT */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={`grid-cols-1 lg:grid-cols-3 gap-6 ${
+        viewMode === "3d" && phase !== Phase.VICTORY ? "hidden" : "grid pointer-events-auto"
+      }`}>
         {/* Left 2 Columns: Dynamic Phase Stage */}
         <div className="lg:col-span-2 space-y-6">
           {/* Phase 1: ROLE ASSIGNMENT */}
@@ -766,77 +927,115 @@ export function GameHUD({
 
         {/* Right 1 Column: Town Hall Chat & Event Feed */}
         <div className="space-y-4">
-          <div className="bg-noir-900 border border-noir-800 rounded-2xl flex flex-col h-[560px] shadow-xl overflow-hidden">
-            {/* Chat Header */}
-            <div className="p-3.5 border-b border-noir-800 bg-noir-950/60 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <MessageSquare className="w-4 h-4 text-emerald-400" />
-                <span className="font-bold text-xs uppercase tracking-wider text-white">
-                  Town Log & Chat
-                </span>
-              </div>
-              <span className="text-[10px] font-mono text-noir-400">
-                {isAlive || phase === Phase.VICTORY ? "Speech Enabled" : "Spectator Muted"}
-              </span>
-            </div>
-
-            {/* Chat Body */}
-            <div className="flex-1 p-3.5 space-y-2.5 overflow-y-auto font-sans text-xs">
-              {chatMessages.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-noir-500 text-center px-4">
-                  No town announcements or chats yet.
-                </div>
-              ) : (
-                chatMessages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`rounded-lg p-2.5 text-xs ${
-                      msg.isSystem
-                        ? "bg-noir-950 border border-noir-800 text-amber-300 font-mono"
-                        : "bg-noir-800/60 text-noir-200"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`font-bold font-mono text-[11px] ${
-                        msg.isSystem ? "text-amber-400" : "text-emerald-400"
-                      }`}>
-                        {msg.senderName}
-                      </span>
-                      <span className="text-[10px] text-noir-500 font-mono">
-                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                      </span>
-                    </div>
-                    <p className="break-words leading-relaxed">{msg.message}</p>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Chat Input */}
-            <form onSubmit={handleChatSubmit} className="p-2.5 border-t border-noir-800 bg-noir-950/80 flex space-x-2">
-              <input
-                type="text"
-                disabled={!isAlive && phase !== Phase.VICTORY}
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder={
-                  isAlive || phase === Phase.VICTORY
-                    ? "Send message to town..."
-                    : "Eliminated players cannot speak to living players"
-                }
-                className="flex-1 bg-noir-900 border border-noir-800 rounded-xl px-3 py-2 text-xs text-white placeholder-noir-500 focus:outline-none focus:border-emerald-500 transition disabled:opacity-50"
-              />
-              <button
-                type="submit"
-                disabled={(!isAlive && phase !== Phase.VICTORY) || !chatInput.trim()}
-                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white transition flex items-center justify-center"
-              >
-                <Send className="w-3.5 h-3.5" />
-              </button>
-            </form>
-          </div>
+          <ChatWidget
+            isAlive={isAlive}
+            phase={phase}
+            chatMessages={chatMessages}
+            chatInput={chatInput}
+            setChatInput={setChatInput}
+            handleChatSubmit={handleChatSubmit}
+            heightClass="h-[560px]"
+          />
         </div>
       </div>
+
+      {/* Floating 3D Mode Widgets */}
+      {viewMode === "3d" && isChatOpen && phase !== Phase.VICTORY && (
+        <div className="fixed bottom-6 right-6 z-30 w-80 sm:w-96 shadow-2xl pointer-events-auto">
+          <ChatWidget
+            isAlive={isAlive}
+            phase={phase}
+            chatMessages={chatMessages}
+            chatInput={chatInput}
+            setChatInput={setChatInput}
+            handleChatSubmit={handleChatSubmit}
+            heightClass="h-[360px]"
+          />
+        </div>
+      )}
+
+      {/* Floating 3D Mode Day Voting Panel */}
+      {viewMode === "3d" && (phase === Phase.DAY_VOTING || phase === Phase.REVOTING) && (
+        <div className="fixed bottom-6 left-6 z-30 max-w-md w-full bg-noir-900/90 backdrop-blur-md border border-noir-800 rounded-2xl p-4 shadow-2xl pointer-events-auto space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Crosshair className="w-4 h-4 text-red-500" />
+              <span className="font-bold text-xs uppercase tracking-wider text-white">
+                {phase === Phase.REVOTING ? "Runoff Vote" : "Tribunal Vote"}
+              </span>
+            </div>
+            <div className="text-[10px] font-mono text-amber-400 font-bold">
+              ≥ {votesRequired} votes needed
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+            {livingPlayers.map((target) => {
+              const isSelf = target.id === sessionId;
+              const isSelected = selectedTargetId === target.id;
+
+              return (
+                <button
+                  key={target.id}
+                  disabled={isSelf || !isAlive}
+                  onClick={() => handleCastDayVote(target.id)}
+                  className={`p-2 rounded-xl border text-xs font-bold transition flex items-center justify-between ${
+                    isSelected
+                      ? "bg-red-600 border-red-500 text-white"
+                      : isSelf
+                      ? "bg-noir-950/40 border-noir-800/40 opacity-40 cursor-not-allowed text-noir-400"
+                      : "bg-noir-950 border-noir-800 hover:border-noir-700 text-white"
+                  }`}
+                >
+                  <span className="truncate">{target.displayName}</span>
+                  {isSelected && <Check className="w-3 h-3 text-white ml-1 shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Floating 3D Mode Mafia Night Hit Panel */}
+      {viewMode === "3d" && phase === Phase.NIGHT && myRole === Role.MAFIA && isAlive && (
+        <div className="fixed bottom-6 left-6 z-30 max-w-md w-full bg-blood-950/90 backdrop-blur-md border border-blood-800/80 rounded-2xl p-4 shadow-2xl pointer-events-auto space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Skull className="w-4 h-4 text-blood-400" />
+              <span className="font-bold text-xs uppercase tracking-wider text-blood-300">
+                Syndicate Hit
+              </span>
+            </div>
+            <span className="text-[10px] font-mono text-blood-400">Plurality wins</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+            {livingCitizensForMafia.map((citizen) => {
+              const isSelected = selectedTargetId === citizen.id;
+              const votes = mafiaVoteCounts[citizen.id] || 0;
+
+              return (
+                <button
+                  key={citizen.id}
+                  onClick={() => handleMafiaTargetVote(citizen.id)}
+                  className={`p-2 rounded-xl border text-xs font-bold transition flex items-center justify-between ${
+                    isSelected
+                      ? "bg-blood-600 border-blood-500 text-white"
+                      : "bg-blood-950/60 border-blood-900/60 hover:border-blood-700 text-blood-200"
+                  }`}
+                >
+                  <span className="truncate">{citizen.displayName}</span>
+                  {votes > 0 && (
+                    <span className="text-[10px] bg-blood-800/80 px-1.5 py-0.5 rounded text-white font-mono ml-1">
+                      {votes}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 3. SECRET ROLE DOSSIER MODAL */}
       {showRoleModal && myRole && (
@@ -904,6 +1103,7 @@ export function GameHUD({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

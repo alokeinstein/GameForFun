@@ -104,25 +104,25 @@
 ## 4. 3D World & Character Controller (Milestone 3)
 
 ### Feature: Stylized Low-Poly Town Square Map
-- **Status:** In Progress
+- **Status:** Implemented
 - **Purpose:** Atmospheric, high-performance 3D environment for social deduction gameplay.
 - **Behaviour:** Central town square tribunal with stone circle for voting, surrounding low-poly buildings, cobblestone paths, and atmospheric street lighting.
 - **Important notes:** Built with React Three Fiber (`@react-three/fiber`, `@react-three/drei`).
 
 ### Feature: Kinematic Character Controller & Camera
-- **Status:** Planned
+- **Status:** Implemented
 - **Purpose:** Responsive third-person player navigation during 3D phases.
 - **Behaviour:** WASD / Arrow key movement, sprint (`Shift`), ground clamping via Rapier physics (`@react-three/rapier`), and smooth third-person follow camera.
 
 ### Feature: Networked Transform Synchronization (20 Hz + Lerp)
-- **Status:** Planned
+- **Status:** Implemented
 - **Purpose:** Fluid multiplayer character movement without lag or excessive bandwidth.
 - **Behaviour:** Local client sends throttled position/rotation to server; server synchronizes at 20 Hz; remote avatars smoothly interpolate (`lerp`) at 60 FPS.
 
 ### Feature: Dynamic Day/Night Lighting Cycle
-- **Status:** Planned
+- **Status:** Implemented
 - **Purpose:** Visual reinforcement of game state transitions in the 3D scene.
-- **Behaviour:** Environment lighting transitions between bright daylight sun and moody midnight moonlight/fog driven by the server's authoritative `phase`.
+- **Behaviour:** Environment lighting transitions between bright daylight sun, sunrise dawn, and moody midnight moonlight/fog driven by the server's authoritative `phase`.
 
 ---
 
