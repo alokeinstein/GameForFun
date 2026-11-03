@@ -17,3 +17,4 @@ export class PlayerState extends Schema {
   @type("number") rotationY: number = 0;
   @type("string") animationState: string = "idle";
 }
+

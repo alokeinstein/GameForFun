@@ -15,3 +15,4 @@ export class GameConfigState extends Schema {
   @type("boolean") allowVoteChanging: boolean = DEFAULT_GAME_CONFIG.allowVoteChanging;
   @type("boolean") isDevMode: boolean = DEFAULT_GAME_CONFIG.isDevMode;
 }
+

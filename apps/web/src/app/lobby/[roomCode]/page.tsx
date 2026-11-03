@@ -34,6 +34,7 @@ import {
   getSavedPlayerName,
   saveReconnectionToken
 } from "../../../services/colyseus";
+import { GameHUD } from "../../../components/game/GameHUD";
 
 interface ChatItem {
   id: string;
@@ -54,6 +55,10 @@ export default function LobbyPage() {
   const [isHost, setIsHost] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [phase, setPhase] = useState("WAITING_FOR_PLAYERS");
+  const [roundNumber, setRoundNumber] = useState(1);
+  const [phaseStartedAt, setPhaseStartedAt] = useState(0);
+  const [phaseEndsAt, setPhaseEndsAt] = useState(0);
+  const [winningTeam, setWinningTeam] = useState("");
   const [config, setConfig] = useState({
     mafiaPercentage: 20,
     nightDurationSec: 30,
@@ -102,6 +107,10 @@ export default function LobbyPage() {
         const updateState = (state: MafiaRoomState) => {
           if (!state) return;
           setPhase(state.phase);
+          setRoundNumber(state.roundNumber || 1);
+          setPhaseStartedAt(state.phaseStartedAt || 0);
+          setPhaseEndsAt(state.phaseEndsAt || 0);
+          setWinningTeam(state.winningTeam || "");
 
           const playerList: PlayerState[] = [];
           state.players.forEach((p) => playerList.push(p));
@@ -220,6 +229,41 @@ export default function LobbyPage() {
     room.send(ClientMessageType.SEND_CHAT, { message: chatInput.trim() });
     setChatInput("");
   };
+
+  const handleReturnToLobby = () => {
+    if (!room || !isHost) return;
+    room.send(ClientMessageType.RESET_TO_LOBBY);
+  };
+
+  const handleLeaveRoom = () => {
+    if (room) {
+      room.leave();
+    }
+    router.push("/");
+  };
+
+  // If match has started, render authoritative in-game HUD
+  if (room && phase !== "WAITING_FOR_PLAYERS") {
+    return (
+      <GameHUD
+        room={room}
+        sessionId={sessionId}
+        players={players}
+        phase={phase}
+        roundNumber={roundNumber}
+        phaseStartedAt={phaseStartedAt}
+        phaseEndsAt={phaseEndsAt}
+        winningTeam={winningTeam}
+        isHost={isHost}
+        chatMessages={chatMessages}
+        onSendChat={(msg) => {
+          room.send(ClientMessageType.SEND_CHAT, { message: msg });
+        }}
+        onReturnToLobby={handleReturnToLobby}
+        onLeaveRoom={handleLeaveRoom}
+      />
+    );
+  }
 
   // Calculate live role counts for display
   const minRequired = config.isDevMode ? 3 : 5;
@@ -593,3 +637,4 @@ export default function LobbyPage() {
     </div>
   );
 }
+

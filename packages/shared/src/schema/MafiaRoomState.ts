@@ -14,3 +14,4 @@ export class MafiaRoomState extends Schema {
   @type({ map: PlayerState }) players = new MapSchema<PlayerState>();
   @type("string") winningTeam: string = "";
 }
+

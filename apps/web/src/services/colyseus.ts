@@ -58,3 +58,4 @@ export async function joinOrCreateMafiaRoom(
 
   return room;
 }
+
