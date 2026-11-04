@@ -37,3 +37,4 @@ COPY --from=builder /app /app
 EXPOSE 2567
 
 CMD ["npm", "--workspace=@mafia/game-server", "run", "start"]
+

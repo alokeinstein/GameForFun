@@ -1,11 +1,11 @@
 # Current Development Status
 
 ## Active Milestone
-**All Core Milestones (0 through 5) Completed! System Ready for Production Playtesting & Staging**
+**3D Character Physics, Urban City Park Environment & In-Game UI Refinement (Completed & Browser-Verified)**
 
 ---
 
-## Completed Milestones
+## Completed Milestones & Enhancements
 - **Milestone 0: Architecture, Rules Engine & Database Foundation** (Commit `76c60f0`)
   - Turborepo monorepo structure with npm workspaces.
   - Complete technical specifications and architectural documentation in `docs/`.
@@ -21,27 +21,41 @@
   - Automated integration test suite in `apps/game-server/tests/GameLoop.test.ts` (all 8 room tests passing).
   - Comprehensive 2D In-Game HUD (`apps/web/src/components/game/GameHUD.tsx`) with role dossiers, night assassination panel, voting matrix, and post-game reveal.
   - Host "Return to Lobby" rematch reset handler.
-- **Milestone 3: 3D Environment, Low-Poly Map & Synced Character Controller** (Commit `5e62d1f`)
-  - Installed React Three Fiber (`@react-three/fiber`), Drei (`@react-three/drei`), Rapier physics (`@react-three/rapier`), and Three.js.
-  - Built stylized low-poly Town Square map (`TownMap.tsx`) with central tribunal circle, benches, surrounding buildings, streetlamps, and dynamic Day/Night lighting and fog.
-  - Built stylized Deadshot.io-style humanoid character avatars (`CharacterAvatar.tsx`) with floating HTML nameplates and procedural walking/running limb animations.
-  - Built Rapier WASM physics kinematic character controller (`CharacterController.tsx`) with WASD movement, Shift sprint, and smooth third-person follow camera.
-  - Implemented 20 Hz player transform network synchronization with client-side linear interpolation (`RemotePlayers.tsx`).
-  - Integrated 3D canvas behind the 2D Game HUD with one-click view toggling (`[3D Town View / Dossier View]`) and floating in-game widgets.
+- **Milestone 3 & Physics/Environment Polish: 3D Urban City Park, Character Physics & UI Docking**
+  - **Fixed Movement & Physics Bug**: Root cause identified (Rapier `RigidBody` receiving dynamic `position` prop on every network tick, teleporting player upward). Cached initial spawn position in `useRef`.
+  - **Decoupled Horizontal and Vertical Physics**: Camera forward projected strictly onto XZ plane ($y=0$); W/A/S/D never affects vertical velocity. Added Spacebar jump with downward raycast ground detection ($v_y = 7.2\text{ m/s}$), natural gravity ($g = -19.2\text{ m/s}^2$), zero rubbery restitution, and zero wall friction.
+  - **Upgraded 3D Environment (`TownMap.tsx`)**: Transformed dark void into an urban city park: 84x84m vibrant green grass lawn, stone crosswalks with curbs, central circular plaza with stepped dais, central civic obelisk monument with glowing beacon, 22 multi-tiered trees (oak, pine, birch) with solid trunk colliders, 8 wooden park benches, 12 ornamental streetlamps with warm pointlights, and 16 perimeter city buildings with illuminated window grids and rooftop water towers/HVAC units.
+  - **Docked Top-0 HUD & Removed Double Navbar**: Removed global navbar from `apps/web/src/app/layout.tsx`. Docked compact HUD bar at `top-0` (67px) containing brand badge, round counter, phase title/countdown, survivors tally, alive status pill, dossier button, mic toggle, and sound controls.
+  - **Automated Browser Testing Verified**: Executed full multi-tab browser test using Microsoft Edge/Puppeteer across 3 real connected players (Host, PlayerBeta, PlayerGamma). Verified 61 FPS rendering, top=0 docking, W/S/A/D movement, Shift sprint, Space jump, obstacle collision, and dossier switching across 10 captured screenshots.
 - **Milestone 4: Positional WebRTC Audio & Social Atmosphere** (Commit `8656ac1`)
-  - Implemented procedural Web Audio API sound effects (`apps/web/src/services/audio.ts`): zero asset downloads, dawn bell, nightfall drone, tribunal gavel strike, doom toll, urgent 10s clock tick, vote confirmations, and victory fanfare.
-  - Implemented WebRTC proximity voice chat (`apps/web/src/services/webrtc.ts`): peer mesh with STUN servers, Colyseus room signaling (`VOICE_SIGNAL`), Voice Activity Detection (VAD), and mic mute toggle (`M` hotkey).
-  - 3D spatial attenuation: dynamic gain calculation based on Euclidean distance in town square with quadratic falloff.
-  - Strict dead player voice isolation: server authoritatively drops voice signals from eliminated players to living players during active rounds.
-  - Visual speaking indicators: animated green rings at feet on 3D character avatars and glowing microphone badges on player roster cards.
-  - Integration test suite in `apps/game-server/tests/VoiceSignaling.test.ts` (all 3 voice signaling tests passing).
-- **Milestone 5: Match History Persistence, Player Statistics & Production Polish** (Verified & Completed)
-  - Implemented Prisma-backed PostgreSQL match archival service (`matchArchival.ts`): records `GameSession`, `GamePlayer`, and `GameEvent` on `Phase.VICTORY` with graceful offline fallback.
-  - Implemented career statistics upsert (`PlayerStats`): tracks games played, victories, mafia/citizen wins, and survival records.
-  - Added REST API endpoints on Game Server (`/api/history`, `/api/stats/:username`, `/api/leaderboard`).
-  - Integrated Career Dossier on Web landing page (`apps/web/src/app/page.tsx`): displays player career record and detailed career breakdown modal.
-  - Multi-container containerization: multi-stage `Dockerfile`s for `apps/game-server` and `apps/web`, orchestrated with PostgreSQL via `docker-compose.yml`.
-  - Automated integration test suite in `apps/game-server/tests/MatchArchival.test.ts` (all 4 tests passing).
+  - Procedural Web Audio API sound effects (church bell, nightfall drone, gavel strike, doom toll, 10s urgent tick, victory fanfare).
+  - WebRTC proximity voice chat with distance attenuation and dead player channel isolation.
+- **Milestone 5: Match History Persistence, Player Statistics & Production Polish** (Commit `f03e3ce`)
+  - Prisma-backed PostgreSQL match archival, career stats, REST endpoints, Docker multi-container compose.
+
+---
+
+## Features Currently in Progress
+- None. Ready for staging deployment and live multi-user playtesting.
+
+---
+
+## Known Bugs & Blockers
+- **None.** Monorepo health is pristine:
+  - 53/53 automated tests passing across `@mafia/game-rules` (38) and `@mafia/game-server` (15).
+  - Full Turborepo typecheck passing across all 5 workspace packages.
+  - Next.js production build (`next build`) passing cleanly.
+  - Automated browser test passing at 61 FPS with verified keyboard physics and UI docking.
+
+---
+
+## Important Incomplete Work
+- None for core gameplay and physics. Ready for live player feedback.
+
+---
+
+## Last Meaningful Checkpoint
+- **3D Physics & Urban Park Environment Refinement Verified**: Fixed upward movement float bug, added spacebar vertical jumping, created rich urban city park with 16 multi-story buildings and 22 trees with colliders, docked HUD at `top-0`, and verified everything via Puppeteer browser testing at 61 FPS.
 
 ---
 

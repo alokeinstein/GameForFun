@@ -101,18 +101,24 @@
 
 ---
 
-## 4. 3D World & Character Controller (Milestone 3)
+## 4. 3D World & Character Controller (Milestone 3 & Physics/Environment Polish)
 
-### Feature: Stylized Low-Poly Town Square Map
-- **Status:** Implemented
-- **Purpose:** Atmospheric, high-performance 3D environment for social deduction gameplay.
-- **Behaviour:** Central town square tribunal with stone circle for voting, surrounding low-poly buildings, cobblestone paths, and atmospheric street lighting.
-- **Important notes:** Built with React Three Fiber (`@react-three/fiber`, `@react-three/drei`).
+### Feature: Stylized Urban City Park & Surrounding Skyline Map
+- **Status:** Implemented (Upgraded)
+- **Purpose:** Highly atmospheric, beautifully lit urban city park for social deduction gameplay, eliminating the pitch-black void.
+- **Behaviour:** 84x84m vibrant green grass lawn, stone crosswalks with curbs, central circular plaza with stepped voting dais, civic obelisk monument with phase-reactive beacon, 22 multi-tiered trees (oak, pine, birch) with solid trunk colliders, 8 wooden park benches with backrests, 12 ornamental streetlamps casting warm pointlights, and 16 multi-story perimeter city buildings with illuminated window grids and rooftop water towers/HVAC units.
+- **Important notes:** Solid Rapier colliders on all obstacles (buildings, benches, trees, monument) and perimeter boundary walls.
 
-### Feature: Kinematic Character Controller & Camera
-- **Status:** Implemented
-- **Purpose:** Responsive third-person player navigation during 3D phases.
-- **Behaviour:** WASD / Arrow key movement, sprint (`Shift`), ground clamping via Rapier physics (`@react-three/rapier`), and smooth third-person follow camera.
+### Feature: Clean Decoupled Kinematic Character Controller & Jump Physics
+- **Status:** Implemented (Upgraded)
+- **Purpose:** Responsive third-person navigation with strict mathematical decoupling of horizontal movement and vertical physics.
+- **Behaviour:** WASD movement calculated relative to camera forward projected onto the horizontal XZ plane ($y=0$). W/A/S/D keys never affect vertical velocity. Spacebar triggers a crisp upward vertical jump ($v_y = 7.2\text{ m/s}$) with downward raycast ground detection. Zero vertical teleportation on network updates; natural Rapier gravity ($g = -19.2\text{ m/s}^2$) and zero-friction capsule collider.
+
+### Feature: Docked Top-0 HUD & In-Game UI Cleanliness
+- **Status:** Implemented (Upgraded)
+- **Purpose:** Eliminate double navbars and provide an unobstructed 3D viewport.
+- **Behaviour:** Redundant global navbar removed from active gameplay. Sleek, compact top bar docked directly at `top-0` (67px) containing brand emblem, round badge, phase title & countdown, survivor tally, living status pill, Dossier view toggle, WebRTC mic button, and SFX volume.
+- **Important notes:** Controls hint banner (`WASD: Move • Shift: Sprint • Space: Jump • M: Mic`) and collapsible Town Chat widget floating cleanly.
 
 ### Feature: Networked Transform Synchronization (20 Hz + Lerp)
 - **Status:** Implemented
@@ -122,7 +128,7 @@
 ### Feature: Dynamic Day/Night Lighting Cycle
 - **Status:** Implemented
 - **Purpose:** Visual reinforcement of game state transitions in the 3D scene.
-- **Behaviour:** Environment lighting transitions between bright daylight sun, sunrise dawn, and moody midnight moonlight/fog driven by the server's authoritative `phase`.
+- **Behaviour:** Environment lighting transitions between bright daylight sun (sky blue, warm sunlight, gentle fog), golden sunrise dawn, and dramatic midnight moonlight/fog with glowing streetlamps driven by the server's authoritative `phase`.
 
 ---
 

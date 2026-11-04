@@ -1,8 +1,8 @@
 # Next Steps
 
 ## Current Immediate Task
-**Production Playtesting & Staging Deployment**
-All core milestones (0 through 5) are verified and complete. The game is fully playable with 3D town navigation, real-time multiplayer networking, procedural Web Audio SFX, proximity WebRTC voice chat, and PostgreSQL match archival.
+**Staging Deployment & Multi-User Playtesting**
+Character movement physics, spacebar jumping, urban city park environment, and top navbar docking have been completely implemented and verified in real browser automation with 10 screenshots captured at 61 FPS.
 
 ---
 
@@ -35,6 +35,9 @@ All core milestones (0 through 5) are verified and complete. The game is fully p
         │
         ▼
 [Milestone 5: Match History Persistence, Career Stats, Docker] (COMPLETED)
+        │
+        ▼
+[Physics & Environment Polish: Decoupled Physics, Urban Park, Docked HUD] (COMPLETED & VERIFIED)
 ```
 
 ---

@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "puppeteer-core": "^25.16.0",
     "turbo": "^2.4.4",
     "typescript": "^5.8.2"
   },

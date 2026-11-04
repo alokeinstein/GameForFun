@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
-import { RigidBody, RapierRigidBody, CapsuleCollider } from "@react-three/rapier";
+import { RigidBody, RapierRigidBody, CapsuleCollider, useRapier } from "@react-three/rapier";
 import { Room } from "colyseus.js";
 import { ClientMessageType, MafiaRoomState, PlayerState } from "@mafia/shared";
 import { CharacterAvatar } from "./CharacterAvatar";
@@ -18,9 +18,19 @@ interface CharacterControllerProps {
 export function CharacterController({ room, player, isHost = false }: CharacterControllerProps) {
   const rigidBodyRef = useRef<RapierRigidBody>(null);
   const avatarGroupRef = useRef<THREE.Group>(null);
+  const { rapier, world } = useRapier();
+
+  // Cache initial position ONLY once on mount to prevent Rapier from teleporting on state updates
+  // Spawn in central plaza (z=5.5) so player is never inside central monument
+  const initialPos = useRef<[number, number, number]>([
+    player.x && Math.abs(player.x) > 0.1 ? player.x : 0,
+    0.35,
+    player.z && Math.abs(player.z) > 0.1 ? player.z : 5.5
+  ]).current;
 
   const [animationState, setAnimationState] = useState<"idle" | "walk" | "run">("idle");
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const canJump = useRef(true);
 
   useEffect(() => {
     const unsub = voiceChatService.subscribe(() => {
@@ -36,12 +46,14 @@ export function CharacterController({ room, player, isHost = false }: CharacterC
     left: boolean;
     right: boolean;
     sprint: boolean;
+    jump: boolean;
   }>({
     forward: false,
     backward: false,
     left: false,
     right: false,
-    sprint: false
+    sprint: false,
+    jump: false
   });
 
   // Network sync throttle (20 Hz = ~50ms)
@@ -79,6 +91,9 @@ export function CharacterController({ room, player, isHost = false }: CharacterC
         case "ShiftRight":
           keys.current.sprint = true;
           break;
+        case "Space":
+          keys.current.jump = true;
+          break;
       }
     };
 
@@ -104,6 +119,9 @@ export function CharacterController({ room, player, isHost = false }: CharacterC
         case "ShiftRight":
           keys.current.sprint = false;
           break;
+        case "Space":
+          keys.current.jump = false;
+          break;
       }
     };
 
@@ -116,55 +134,84 @@ export function CharacterController({ room, player, isHost = false }: CharacterC
     };
   }, []);
 
-  useFrame((state, delta) => {
+  useFrame((state) => {
     if (!rigidBodyRef.current) return;
 
     const rb = rigidBodyRef.current;
     const translation = rb.translation();
+    const currentVel = rb.linvel();
 
-    // 1. Movement Input Vector Calculation
-    const moveZ = (keys.current.forward ? -1 : 0) + (keys.current.backward ? 1 : 0);
-    const moveX = (keys.current.left ? -1 : 0) + (keys.current.right ? 1 : 0);
+    // 1. Calculate camera-relative horizontal movement vector
+    // Strip camera pitch (camForward.y = 0) so camera angle NEVER introduces vertical velocity
+    const camForward = new THREE.Vector3();
+    state.camera.getWorldDirection(camForward);
+    camForward.y = 0;
+    camForward.normalize();
 
-    const isMoving = moveX !== 0 || moveZ !== 0;
+    const camRight = new THREE.Vector3();
+    camRight.crossVectors(camForward, new THREE.Vector3(0, 1, 0)).normalize();
+
+    const moveDir = new THREE.Vector3(0, 0, 0);
+    if (keys.current.forward) moveDir.add(camForward);
+    if (keys.current.backward) moveDir.sub(camForward);
+    if (keys.current.right) moveDir.add(camRight);
+    if (keys.current.left) moveDir.sub(camRight);
+
+    const isMoving = moveDir.lengthSq() > 0.001;
+    if (isMoving) {
+      moveDir.normalize();
+    }
+
     const isSprinting = keys.current.sprint && isMoving;
     const currentSpeed = isSprinting ? 8.5 : 5.0;
 
-    const moveDir = new THREE.Vector3(moveX, 0, moveZ);
+    // Decoupled horizontal velocities (X and Z)
+    const targetVelX = isMoving ? moveDir.x * currentSpeed : currentVel.x * 0.7;
+    const targetVelZ = isMoving ? moveDir.z * currentSpeed : currentVel.z * 0.7;
+
+    // 2. Vertical movement & ground detection (Y axis only)
+    let isGrounded = false;
+    try {
+      const rayOrigin = { x: translation.x, y: translation.y + 0.25, z: translation.z };
+      const rayDir = { x: 0, y: -1, z: 0 };
+      const ray = new rapier.Ray(rayOrigin, rayDir);
+      const playerCollider = rb.collider(0);
+      const hit = world.castRay(ray, 0.45, true, undefined, undefined, playerCollider);
+      if (hit !== null && hit.timeOfImpact <= 0.38) {
+        isGrounded = Math.abs(currentVel.y) < 1.0;
+      }
+    } catch {
+      isGrounded = translation.y <= 0.4 && Math.abs(currentVel.y) < 0.2;
+    }
+
+    let targetVelY = currentVel.y;
+    if (isGrounded && keys.current.jump && canJump.current) {
+      canJump.current = false;
+      setTimeout(() => {
+        canJump.current = true;
+      }, 280);
+      targetVelY = 7.2; // Upward vertical jump impulse
+    }
+
+    // 3. Apply cleanly decoupled horizontal and vertical velocities
+    rb.setLinvel(
+      {
+        x: targetVelX,
+        y: targetVelY,
+        z: targetVelZ
+      },
+      true
+    );
+
+    // 4. Rotate avatar toward movement direction (shortest angle lerp)
     if (isMoving) {
-      moveDir.normalize();
-
-      // Apply linear velocity on X and Z, preserving Y gravity
-      const currentVel = rb.linvel();
-      rb.setLinvel(
-        {
-          x: moveDir.x * currentSpeed,
-          y: currentVel.y,
-          z: moveDir.z * currentSpeed
-        },
-        true
-      );
-
-      // Rotate avatar toward movement direction
       const targetRotationY = Math.atan2(moveDir.x, moveDir.z);
       if (avatarGroupRef.current) {
-        avatarGroupRef.current.rotation.y = THREE.MathUtils.lerp(
-          avatarGroupRef.current.rotation.y,
-          targetRotationY,
-          0.2
-        );
+        let diff = targetRotationY - avatarGroupRef.current.rotation.y;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        avatarGroupRef.current.rotation.y += diff * 0.25;
       }
-    } else {
-      // Decelerate quickly on release
-      const currentVel = rb.linvel();
-      rb.setLinvel(
-        {
-          x: currentVel.x * 0.7,
-          y: currentVel.y,
-          z: currentVel.z * 0.7
-        },
-        true
-      );
     }
 
     const currentAnim = !isMoving ? "idle" : isSprinting ? "run" : "walk";
@@ -172,18 +219,18 @@ export function CharacterController({ room, player, isHost = false }: CharacterC
       setAnimationState(currentAnim);
     }
 
-    // 2. Smooth Third-Person Camera Follow
-    const cameraOffset = new THREE.Vector3(0, 5.5, 9.0);
+    // 5. Smooth Third-Person Camera Follow
+    const cameraOffset = new THREE.Vector3(0, 5.2, 8.5);
     const targetCameraPos = new THREE.Vector3(
       translation.x + cameraOffset.x,
       translation.y + cameraOffset.y,
       translation.z + cameraOffset.z
     );
 
-    state.camera.position.lerp(targetCameraPos, 0.08);
+    state.camera.position.lerp(targetCameraPos, 0.09);
     state.camera.lookAt(translation.x, translation.y + 1.2, translation.z);
 
-    // 3. Network Transform Dispatch (~20 Hz)
+    // 6. Network Transform Dispatch (~20 Hz)
     const now = Date.now();
     if (now - lastSyncTime.current > 50) {
       lastSyncTime.current = now;
@@ -191,6 +238,7 @@ export function CharacterController({ room, player, isHost = false }: CharacterC
       const currentRotY = avatarGroupRef.current ? avatarGroupRef.current.rotation.y : 0;
       const moved =
         Math.abs(translation.x - lastSentPos.current.x) > 0.02 ||
+        Math.abs(translation.y - lastSentPos.current.y) > 0.05 ||
         Math.abs(translation.z - lastSentPos.current.z) > 0.02 ||
         Math.abs(currentRotY - lastSentPos.current.rotY) > 0.04 ||
         currentAnim !== lastSentPos.current.anim;
@@ -220,12 +268,13 @@ export function CharacterController({ room, player, isHost = false }: CharacterC
       ref={rigidBodyRef}
       type="dynamic"
       colliders={false}
-      position={[player.x || 0, (player.y || 0) + 1, player.z || 0]}
+      position={initialPos}
       enabledRotations={[false, false, false]}
-      linearDamping={2.5}
+      linearDamping={0.15}
+      gravityScale={1.2}
       mass={1.0}
     >
-      <CapsuleCollider args={[0.55, 0.35]} position={[0, 0.9, 0]} />
+      <CapsuleCollider args={[0.55, 0.35]} position={[0, 0.9, 0]} friction={0.0} restitution={0.0} />
       <group ref={avatarGroupRef}>
         <CharacterAvatar
           displayName={player.displayName}

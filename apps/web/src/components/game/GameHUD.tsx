@@ -479,81 +479,74 @@ export function GameHUD({
         isHost={isHost}
       />
 
-      {/* Floating HUD Container (Overlays 3D Scene) */}
-      <div className={`relative z-10 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6 ${
-        viewMode === "3d" ? "pointer-events-none" : "pointer-events-auto"
-      }`}>
-        {/* 1. TOP STATUS & CLOCK HUD */}
-        <div className="bg-noir-900/85 backdrop-blur-md border border-noir-800/80 rounded-2xl p-4 sm:p-5 shadow-2xl relative overflow-hidden pointer-events-auto">
-        {/* Progress bar along top border */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-noir-800">
+      {/* 1. DOCKED TOP STATUS & CLOCK HUD BAR */}
+      <div className="fixed top-0 left-0 right-0 z-40 bg-noir-900/90 backdrop-blur-md border-b border-noir-800 shadow-2xl pointer-events-auto">
+        {/* Progress bar along top edge */}
+        <div className="h-1 w-full bg-noir-800">
           <div
             className="h-full bg-gradient-to-r from-blood-600 via-amber-500 to-emerald-500 transition-all duration-300 ease-linear"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
 
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          {/* Phase Badge & Description */}
-          <div className="flex items-center space-x-3">
-            <div className={`p-3 rounded-xl border ${phaseInfo.color}`}>
-              {phaseInfo.icon}
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-mono text-xs uppercase tracking-widest text-noir-400">
-                  Round {roundNumber}
-                </span>
-                <span className="text-noir-600">•</span>
-                <span className="font-bold text-white tracking-wide text-lg">
-                  {phaseInfo.title}
-                </span>
+        <div className="max-w-7xl mx-auto px-4 py-2 sm:py-2.5 flex items-center justify-between gap-3">
+          {/* Left: Brand + Phase Icon & Info */}
+          <div className="flex items-center space-x-3 min-w-0">
+            {/* Compact Brand Logo */}
+            <div className="flex items-center space-x-2 shrink-0">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blood-600 to-blood-500 flex items-center justify-center font-bold text-white text-xs shadow-md shadow-blood-600/30">
+                M
               </div>
-              <p className="text-xs text-noir-300 mt-0.5 max-w-md">
-                {phaseInfo.subtitle}
-              </p>
+              <span className="font-extrabold text-sm tracking-wider text-white hidden sm:inline">
+                MAFIA <span className="text-blood-500 text-[10px] font-mono px-1 py-0.5 rounded bg-blood-600/10 border border-blood-500/20">3D</span>
+              </span>
+            </div>
+
+            <div className="h-5 w-px bg-noir-800 hidden sm:block" />
+
+            {/* Phase Badge & Description */}
+            <div className="flex items-center space-x-2.5 min-w-0">
+              <div className={`p-2 rounded-lg border shrink-0 ${phaseInfo.color}`}>
+                {phaseInfo.icon}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center space-x-2">
+                  <span className="font-mono text-[11px] uppercase tracking-wider text-noir-400 shrink-0">
+                    Round {roundNumber}
+                  </span>
+                  <span className="text-noir-600">•</span>
+                  <span className="font-bold text-white tracking-wide text-sm sm:text-base truncate">
+                    {phaseInfo.title}
+                  </span>
+                </div>
+                <p className="text-[11px] text-noir-300 truncate hidden lg:block">
+                  {phaseInfo.subtitle}
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* Countdown & Alive Counter */}
-          <div className="flex items-center space-x-4 self-end md:self-auto">
+          {/* Right: Timer, Survivors, Role, Controls */}
+          <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
             {/* Countdown Timer */}
-            <div className="flex items-center space-x-2 bg-noir-950/80 border border-noir-800 px-4 py-2.5 rounded-xl">
-              <Clock className="w-4 h-4 text-amber-400 animate-pulse" />
-              <div className="font-mono font-black text-2xl text-white tracking-wider">
+            <div className="flex items-center space-x-1.5 bg-noir-950/90 border border-noir-800 px-3 py-1.5 rounded-lg">
+              <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+              <span className="font-mono font-black text-lg sm:text-xl text-white tracking-wider">
                 {secondsRemaining}s
-              </div>
+              </span>
             </div>
 
             {/* Living Survivors Counter */}
-            <div className="hidden sm:flex flex-col items-end bg-noir-950/60 border border-noir-800 px-3.5 py-2 rounded-xl text-right">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-noir-400">Survivors</span>
-              <span className="text-sm font-bold text-emerald-400">
+            <div className="hidden sm:flex flex-col items-end bg-noir-950/60 border border-noir-800 px-2.5 py-1 rounded-lg text-right">
+              <span className="text-[9px] font-mono uppercase tracking-wider text-noir-400">Survivors</span>
+              <span className="text-xs font-bold text-emerald-400">
                 {livingPlayers.length} / {players.length} Alive
               </span>
             </div>
 
-            {/* My Role Pill & Peek Button */}
-            {myRole && (
-              <button
-                onClick={() => setShowRoleModal(true)}
-                className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl border transition ${
-                  myRole === Role.MAFIA
-                    ? "bg-blood-600/20 border-blood-500/50 text-blood-400 hover:bg-blood-600/30"
-                    : "bg-emerald-500/20 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/30"
-                }`}
-                title="View your secret dossier"
-              >
-                {myRole === Role.MAFIA ? <Skull className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
-                <span className="font-mono text-xs font-bold uppercase tracking-wider">
-                  {myRole}
-                </span>
-              </button>
-            )}
-
             {/* Living / Dead status badge */}
             <div
-              className={`px-3 py-1.5 rounded-lg border text-xs font-bold font-mono uppercase tracking-wider ${
+              className={`px-2.5 py-1 rounded-lg border text-xs font-bold font-mono uppercase tracking-wider ${
                 isAlive
                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
                   : "bg-noir-800 border-noir-700 text-noir-400 flex items-center space-x-1"
@@ -567,21 +560,39 @@ export function GameHUD({
               )}
             </div>
 
+            {/* My Role Pill & Peek Button */}
+            {myRole && (
+              <button
+                onClick={() => setShowRoleModal(true)}
+                className={`hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border transition ${
+                  myRole === Role.MAFIA
+                    ? "bg-blood-600/20 border-blood-500/50 text-blood-400 hover:bg-blood-600/30"
+                    : "bg-emerald-500/20 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/30"
+                }`}
+                title="View your secret dossier"
+              >
+                {myRole === Role.MAFIA ? <Skull className="w-3.5 h-3.5" /> : <Shield className="w-3.5 h-3.5" />}
+                <span className="font-mono text-xs font-bold uppercase tracking-wider">
+                  {myRole}
+                </span>
+              </button>
+            )}
+
             {/* View Mode Switcher */}
             <button
               onClick={() => setViewMode(viewMode === "3d" ? "hud" : "3d")}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-noir-700 bg-noir-800/90 hover:bg-noir-700 text-xs font-mono font-bold text-white transition pointer-events-auto shadow-sm"
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-noir-700 bg-noir-800/90 hover:bg-noir-700 text-xs font-mono font-bold text-white transition pointer-events-auto shadow-sm"
               title="Toggle between 3D Town View and Dossier View"
             >
               {viewMode === "3d" ? (
                 <>
                   <LayoutDashboard className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Dossier View</span>
+                  <span className="hidden sm:inline">Dossier View</span>
                 </>
               ) : (
                 <>
                   <Boxes className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>3D Town</span>
+                  <span className="hidden sm:inline">3D Town</span>
                 </>
               )}
             </button>
@@ -592,7 +603,7 @@ export function GameHUD({
                 const muted = voiceChatService.toggleMute();
                 setIsMicMuted(muted);
               }}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border transition pointer-events-auto shadow-sm text-xs font-mono font-bold ${
+              className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg border transition pointer-events-auto shadow-sm text-xs font-mono font-bold ${
                 isMicMuted
                   ? "bg-rose-950/40 border-rose-800/80 text-rose-400 hover:bg-rose-900/50"
                   : isSpeaking
@@ -617,7 +628,7 @@ export function GameHUD({
                   e.preventDefault();
                   setShowVolumeSlider(!showVolumeSlider);
                 }}
-                className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border transition shadow-sm text-xs font-mono font-bold ${
+                className={`flex items-center px-2 py-1 rounded-lg border transition shadow-sm text-xs font-mono font-bold ${
                   sfxMuted
                     ? "bg-noir-900 border-noir-800 text-noir-500 hover:text-noir-300"
                     : "bg-noir-800/90 border-noir-700 text-amber-400 hover:bg-noir-700"
@@ -655,9 +666,9 @@ export function GameHUD({
         </div>
       </div>
 
-      {/* Controls Hint Pill in 3D Mode */}
+      {/* 2. CONTROLS BANNER & CHAT TOGGLE IN 3D MODE */}
       {viewMode === "3d" && (
-        <div className="flex items-center justify-between pointer-events-none">
+        <div className="fixed top-16 left-4 right-4 z-30 flex items-center justify-between pointer-events-none">
           <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-noir-950/80 backdrop-blur-md border border-noir-800/80 text-noir-300 text-[11px] font-mono pointer-events-auto shadow-md">
             <Compass className="w-3.5 h-3.5 text-blue-400" />
             <span className="text-white font-bold">WASD:</span>
@@ -666,7 +677,10 @@ export function GameHUD({
             <span className="text-amber-400 font-bold">Shift:</span>
             <span>Sprint</span>
             <span className="text-noir-600">•</span>
-            <span className="text-emerald-400 font-bold">M:</span>
+            <span className="text-emerald-400 font-bold">Space:</span>
+            <span>Jump</span>
+            <span className="text-noir-600">•</span>
+            <span className="text-blue-400 font-bold">M:</span>
             <span>Mic</span>
           </div>
 
@@ -679,6 +693,11 @@ export function GameHUD({
           </button>
         </div>
       )}
+
+      {/* 3. DOSSIER VIEW CONTENT CONTAINER */}
+      <div className={`relative z-10 max-w-7xl w-full mx-auto pt-20 p-4 sm:p-6 space-y-6 ${
+        viewMode === "3d" ? "pointer-events-none" : "pointer-events-auto"
+      }`}>
 
       {/* 2. MAIN INTERACTIVE STAGE & CHAT LAYOUT */}
       <div className={`grid-cols-1 lg:grid-cols-3 gap-6 ${

@@ -1,5 +1,14 @@
 # Changes Log
 
+## 2026-11-04
+
+- Fixed: Resolved character vertical elevation bug in `CharacterController.tsx` where Rapier `RigidBody` received dynamic `position` updates on every network tick, causing character to float upward during W/S and fall from the air on key release. Fixed by caching initial spawn position once on mount using `useRef`.
+- Fixed: Decoupled horizontal and vertical character physics cleanly. Projected camera forward direction onto the horizontal ground plane ($y=0$) so camera pitch never introduces vertical velocity. Applied horizontal movement strictly to $x$ and $z$ velocities.
+- Added: Spacebar vertical jump physics ($v_y = 7.2\text{ m/s}$) with downward raycast ground detection, natural Rapier gravity ($g = -19.2\text{ m/s}^2$), and zero wall friction on capsule colliders.
+- Upgraded: Redesigned 3D environment in `TownMap.tsx` from pitch-black void into a vibrant, stylized Urban City Park: 84x84m vibrant green grass lawn, stone crosswalks with curbs, central circular plaza with stepped dais, central civic obelisk monument with glowing phase-reactive beacon, 22 multi-tiered trees (oak, pine, birch) with solid trunk colliders, 8 wooden park benches, 12 ornamental streetlamps with warm pointlights, and 16 perimeter city buildings with illuminated window grids and rooftop water towers/HVAC units.
+- Fixed: Removed redundant global navbar from `apps/web/src/app/layout.tsx` during active gameplay. Docked sleek, compact in-game HUD bar directly at `top-0` (67px) containing brand badge, round counter, phase title/countdown, survivors tally, alive status pill, dossier button, mic toggle, and sound controls.
+- Added: Automated multi-tab browser test script (`scripts/browser-test.mjs`) using Microsoft Edge and Puppeteer. Verified 61 FPS rendering performance, top=0 docking, W/S/A/D movement, Shift sprint, Space jump, obstacle collision, and dossier switching across 10 captured screenshots.
+
 ## 2026-11-03
 
 - Added: Prisma-backed match archival service (`apps/game-server/src/services/matchArchival.ts`) persisting `GameSession`, `GamePlayer`, and `GameEvent` upon `Phase.VICTORY` with offline graceful fallback.

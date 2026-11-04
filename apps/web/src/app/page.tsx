@@ -84,9 +84,30 @@ export default function HomePage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden">
-      {/* Background radial atmosphere */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blood-600/10 rounded-full blur-[140px] pointer-events-none"></div>
+    <div className="flex-1 flex flex-col min-h-screen">
+      <header className="border-b border-noir-800 bg-noir-900/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blood-600 to-blood-500 flex items-center justify-center font-bold text-white shadow-lg shadow-blood-600/30">
+              M
+            </div>
+            <span className="font-extrabold text-lg tracking-wider text-white">
+              MAFIA <span className="text-blood-500 text-xs font-mono px-1.5 py-0.5 rounded bg-blood-600/10 border border-blood-500/20">3D</span>
+            </span>
+          </div>
+          <div className="flex items-center space-x-4 text-xs font-mono text-noir-400">
+            <span className="flex items-center space-x-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>SERVER ONLINE</span>
+            </span>
+            <span>v0.1.0</span>
+          </div>
+        </div>
+      </header>
+
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden">
+        {/* Background radial atmosphere */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blood-600/10 rounded-full blur-[140px] pointer-events-none"></div>
 
       <div className="max-w-4xl w-full mx-auto space-y-10 z-10">
         {/* Hero Title */}
@@ -260,6 +281,7 @@ export default function HomePage() {
         )}
       </div>
     </div>
+  </div>
   );
 }
 
