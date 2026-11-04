@@ -680,8 +680,19 @@ export function GameHUD({
             <span className="text-emerald-400 font-bold">Space:</span>
             <span>Jump</span>
             <span className="text-noir-600">•</span>
-            <span className="text-blue-400 font-bold">M:</span>
-            <span>Mic</span>
+            <span className="text-blue-400 font-bold">Mouse:</span>
+            <span>Look</span>
+            <span className="text-noir-600">•</span>
+            <span className="text-rose-400 font-bold">ESC:</span>
+            <span>Release</span>
+          </div>
+
+          <div className="hidden md:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-noir-950/80 backdrop-blur-md border border-noir-800/80 text-[11px] font-mono text-noir-300 pointer-events-auto shadow-md">
+            <span className="text-amber-400 font-bold">Click viewport</span>
+            <span>to look around</span>
+            <span className="text-noir-600">•</span>
+            <span className="text-white font-bold">ESC</span>
+            <span>to release mouse</span>
           </div>
 
           <button

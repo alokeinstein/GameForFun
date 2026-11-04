@@ -1,7 +1,7 @@
 # Current Development Status
 
 ## Active Milestone
-**3D Character Physics, Urban City Park Environment & In-Game UI Refinement (Completed & Browser-Verified)**
+**GTA-Style Third-Person Camera, Stable Movement & Multiplayer Verification (Completed & Browser-Verified)**
 
 ---
 
@@ -22,11 +22,18 @@
   - Comprehensive 2D In-Game HUD (`apps/web/src/components/game/GameHUD.tsx`) with role dossiers, night assassination panel, voting matrix, and post-game reveal.
   - Host "Return to Lobby" rematch reset handler.
 - **Milestone 3 & Physics/Environment Polish: 3D Urban City Park, Character Physics & UI Docking**
-  - **Fixed Movement & Physics Bug**: Root cause identified (Rapier `RigidBody` receiving dynamic `position` prop on every network tick, teleporting player upward). Cached initial spawn position in `useRef`.
-  - **Decoupled Horizontal and Vertical Physics**: Camera forward projected strictly onto XZ plane ($y=0$); W/A/S/D never affects vertical velocity. Added Spacebar jump with downward raycast ground detection ($v_y = 7.2\text{ m/s}$), natural gravity ($g = -19.2\text{ m/s}^2$), zero rubbery restitution, and zero wall friction.
-  - **Upgraded 3D Environment (`TownMap.tsx`)**: Transformed dark void into an urban city park: 84x84m vibrant green grass lawn, stone crosswalks with curbs, central circular plaza with stepped dais, central civic obelisk monument with glowing beacon, 22 multi-tiered trees (oak, pine, birch) with solid trunk colliders, 8 wooden park benches, 12 ornamental streetlamps with warm pointlights, and 16 perimeter city buildings with illuminated window grids and rooftop water towers/HVAC units.
-  - **Docked Top-0 HUD & Removed Double Navbar**: Removed global navbar from `apps/web/src/app/layout.tsx`. Docked compact HUD bar at `top-0` (67px) containing brand badge, round counter, phase title/countdown, survivors tally, alive status pill, dossier button, mic toggle, and sound controls.
-  - **Automated Browser Testing Verified**: Executed full multi-tab browser test using Microsoft Edge/Puppeteer across 3 real connected players (Host, PlayerBeta, PlayerGamma). Verified 61 FPS rendering, top=0 docking, W/S/A/D movement, Shift sprint, Space jump, obstacle collision, and dossier switching across 10 captured screenshots.
+  - Fixed upward movement float bug; cached initial spawn position.
+  - Decoupled horizontal and vertical physics; Spacebar jump with downward raycasting ground check.
+  - Redesigned 3D map into vibrant Urban City Park (84x84m lawn, obelisk, 22 trees with colliders, benches, streetlamps, 16 buildings).
+  - Docked compact HUD bar at `top-0` (67px); removed redundant layout navbar.
+- **GTA-Style Third-Person Orbit Camera & Movement Polish (Current Completion)**
+  - **Zero Camera Bobbing:** Decoupled animated torso oscillation from camera target. Added exponential smoothing and low-pass vertical filtering (`lerp(..., 0.08)`) on camera look target, completely eliminating scene jitter and head-bobbing.
+  - **Sprinting Ground Clamping:** Eliminated automatic hopping/jumping during `Shift + W` sprint by clamping grounded non-jumping vertical velocity to `-0.6 m/s`. This neutralizes Rapier solver numerical bounce impulses and guarantees smooth, grounded high-speed sprinting ($8.5\text{ m/s}$). Explicit jumping remains strictly on Spacebar.
+  - **Spherical Mouse Orbit Camera:** Full 360-degree yaw and clamped pitch ($[-0.2, 1.2]$ rad) controlled by mouse movement. Distance scroll zoom ($3.2$m to $13.0$m).
+  - **Camera-Relative WASD Movement:** Directional vectors dynamically project from current camera yaw heading ($\mathbf{F}_{\text{cam}}, \mathbf{R}_{\text{cam}}$). Free camera orbit while stationary without forcing character to turn.
+  - **Pointer Lock Integration:** Click viewport to capture mouse, `ESC` to release. Intelligent element filtering prevents capturing cursor when interacting with chat or HUD.
+  - **Multiplayer Camera Isolation:** Cameras are fully independent on each client; networked player transforms sync smoothly at 20 Hz with client-side lerp.
+  - **Automated Browser Testing Verified:** Ran `scripts/gta-camera-browser-test.mjs` in Microsoft Edge across 3 real connected players. All 4 test suites (Tests A, B, C, D) passed at 61 FPS with 11 screenshot artifacts captured.
 - **Milestone 4: Positional WebRTC Audio & Social Atmosphere** (Commit `8656ac1`)
   - Procedural Web Audio API sound effects (church bell, nightfall drone, gavel strike, doom toll, 10s urgent tick, victory fanfare).
   - WebRTC proximity voice chat with distance attenuation and dead player channel isolation.
@@ -36,39 +43,16 @@
 ---
 
 ## Features Currently in Progress
-- None. Ready for staging deployment and live multi-user playtesting.
+- None. Core camera, movement, gameplay, audio, and networking are complete and verified.
 
 ---
 
 ## Known Bugs & Blockers
 - **None.** Monorepo health is pristine:
   - 53/53 automated tests passing across `@mafia/game-rules` (38) and `@mafia/game-server` (15).
-  - Full Turborepo typecheck passing across all 5 workspace packages.
+  - Turborepo typecheck passing across all packages.
   - Next.js production build (`next build`) passing cleanly.
-  - Automated browser test passing at 61 FPS with verified keyboard physics and UI docking.
-
----
-
-## Important Incomplete Work
-- None for core gameplay and physics. Ready for live player feedback.
-
----
-
-## Last Meaningful Checkpoint
-- **3D Physics & Urban Park Environment Refinement Verified**: Fixed upward movement float bug, added spacebar vertical jumping, created rich urban city park with 16 multi-story buildings and 22 trees with colliders, docked HUD at `top-0`, and verified everything via Puppeteer browser testing at 61 FPS.
-
----
-
-## Features Currently in Progress
-- None. Core development completed. Future enhancements: matchmaking queues, custom cosmetics, OAuth authentication.
-
----
-
-## Known Bugs & Blockers
-- **None.** Monorepo health is pristine:
-  - 53/53 automated tests passing across `@mafia/game-rules` (38) and `@mafia/game-server` (15).
-  - Turborepo typecheck passing across all 5 workspace packages.
-  - Next.js production build (`next build`) passing cleanly.
+  - Automated browser test passing at 61 FPS across all 4 test suites with 11 visual screenshots.
 
 ---
 
@@ -78,4 +62,4 @@
 ---
 
 ## Last Meaningful Checkpoint
-- **Milestone 5 Completed**: Match history persistence, career statistics tracking, REST endpoints, Docker multi-container setup, and Career Dossier UI verified with production build and 53/53 tests passing.
+- **GTA-Style Third-Person Camera & Movement Experience Verified**: Implemented mouse orbit camera with pointer lock, camera-relative WASD steering, zero-bobbing camera stabilization, and sprint bounce elimination. Verified in real Edge browser automation with 3 players at 61 FPS.

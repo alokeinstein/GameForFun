@@ -2,6 +2,13 @@
 
 ## 2026-11-04
 
+- Added: Implemented GTA Vice City-style spherical orbit camera (`CharacterController.tsx`) with mouse-driven yaw and pitch control (clamped between $[-0.2, 1.2]$ radians) and mouse wheel distance zoom ($3.2$m to $13.0$m).
+- Added: Integrated HTML5 Pointer Lock API with automatic canvas capture on click and instant cursor release on `Escape`. Intelligently ignores clicks originating on HUD controls, buttons, input bars, and chat elements to preserve full UI interactivity.
+- Added: Dynamic camera-relative WASD movement. Camera forward ($\mathbf{F}_{\text{cam}}$) and right ($\mathbf{R}_{\text{cam}}$) vectors are projected on the ground plane, orienting character movement directly to the player's viewing angle. Moving the mouse while stationary orbits freely without spinning the character avatar.
+- Fixed: Eliminated camera bobbing and scene vertical jitter during walking and running. Decoupled torso oscillation from camera tracking in `CharacterAvatar.tsx` (stabilizing torso height at $0.95$m) and added smoothed exponential lerp with vertical low-pass filtering (`lerp(..., 0.08)`) on camera focus target.
+- Fixed: Resolved automatic jumping during `Shift + W` sprinting. Eliminated Rapier numerical contact-solver bounce impulses by clamping grounded vertical velocity to $-0.6\text{ m/s}$ during non-jump frames, ensuring continuous horizontal sprint at $8.5\text{ m/s}$. Isolated jumping strictly to explicit Spacebar inputs.
+- Added: Updated Game HUD controls banner to display `WASD: Move • Shift: Sprint • Space: Jump • Mouse: Look • ESC: Release` and added center viewport hint pill `"Click viewport to look around • ESC to release mouse"`.
+- Added: Created automated multi-player browser test suite (`scripts/gta-camera-browser-test.mjs`) in Microsoft Edge / Puppeteer across 3 connected clients. Verified all 4 test suites (Tests A, B, C, D) passing at 61 FPS with 11 screenshot artifacts.
 - Fixed: Resolved character vertical elevation bug in `CharacterController.tsx` where Rapier `RigidBody` received dynamic `position` updates on every network tick, causing character to float upward during W/S and fall from the air on key release. Fixed by caching initial spawn position once on mount using `useRef`.
 - Fixed: Decoupled horizontal and vertical character physics cleanly. Projected camera forward direction onto the horizontal ground plane ($y=0$) so camera pitch never introduces vertical velocity. Applied horizontal movement strictly to $x$ and $z$ velocities.
 - Added: Spacebar vertical jump physics ($v_y = 7.2\text{ m/s}$) with downward raycast ground detection, natural Rapier gravity ($g = -19.2\text{ m/s}^2$), and zero wall friction on capsule colliders.

@@ -2,7 +2,7 @@
 
 ## Current Immediate Task
 **Staging Deployment & Multi-User Playtesting**
-Character movement physics, spacebar jumping, urban city park environment, and top navbar docking have been completely implemented and verified in real browser automation with 10 screenshots captured at 61 FPS.
+GTA-style third-person mouse orbit camera, pointer lock integration, camera-relative movement, zero-bobbing camera stabilization, and sprint bounce elimination have been completely implemented and verified in real browser automation with 11 screenshots captured at 61 FPS.
 
 ---
 
@@ -38,6 +38,9 @@ Character movement physics, spacebar jumping, urban city park environment, and t
         │
         ▼
 [Physics & Environment Polish: Decoupled Physics, Urban Park, Docked HUD] (COMPLETED & VERIFIED)
+        │
+        ▼
+[GTA-Style Camera & Movement: Mouse Orbit, Pointer Lock, Stable Sprint] (COMPLETED & VERIFIED)
 ```
 
 ---

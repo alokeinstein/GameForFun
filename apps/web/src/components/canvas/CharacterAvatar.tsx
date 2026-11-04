@@ -30,29 +30,38 @@ export function CharacterAvatar({
   const rightArmRef = useRef<THREE.Group>(null);
   const torsoRef = useRef<THREE.Group>(null);
 
-  // Procedural limb animation (walk/run cycle)
+  // Procedural limb animation (walk/run/jump/idle cycle)
   useFrame((state) => {
     if (!isAlive) return;
 
     const t = state.clock.getElapsedTime();
+    const isJumping = animationState === "jump";
     const isMoving = animationState === "walk" || animationState === "run";
-    const speedMultiplier = animationState === "run" ? 14 : 9;
-    const amplitude = animationState === "run" ? 0.65 : 0.45;
+    const speedMultiplier = animationState === "run" ? 13 : 8.5;
+    const amplitude = animationState === "run" ? 0.65 : 0.42;
 
-    if (isMoving) {
+    if (isJumping) {
+      // Dynamic airborne jump pose: legs tucked slightly, arms raised
+      if (leftLegRef.current) leftLegRef.current.rotation.x = 0.35;
+      if (rightLegRef.current) rightLegRef.current.rotation.x = 0.25;
+      if (leftArmRef.current) leftArmRef.current.rotation.x = -0.6;
+      if (rightArmRef.current) rightArmRef.current.rotation.x = -0.6;
+      if (torsoRef.current) torsoRef.current.position.y = 0.95;
+    } else if (isMoving) {
+      // Natural walk / run limb swings with vertically stable torso (ZERO camera bobbing)
       const swing = Math.sin(t * speedMultiplier) * amplitude;
       if (leftLegRef.current) leftLegRef.current.rotation.x = swing;
       if (rightLegRef.current) rightLegRef.current.rotation.x = -swing;
-      if (leftArmRef.current) leftArmRef.current.rotation.x = -swing * 0.9;
-      if (rightArmRef.current) rightArmRef.current.rotation.x = swing * 0.9;
-      if (torsoRef.current) torsoRef.current.position.y = 0.95 + Math.abs(Math.sin(t * speedMultiplier * 2)) * 0.06;
+      if (leftArmRef.current) leftArmRef.current.rotation.x = -swing * 0.85;
+      if (rightArmRef.current) rightArmRef.current.rotation.x = swing * 0.85;
+      if (torsoRef.current) torsoRef.current.position.y = 0.95;
     } else {
-      // Gentle idle breathing
+      // Neutral idle stance with gentle breathing
       if (leftLegRef.current) leftLegRef.current.rotation.x = 0;
       if (rightLegRef.current) rightLegRef.current.rotation.x = 0;
       if (leftArmRef.current) leftArmRef.current.rotation.x = 0;
       if (rightArmRef.current) rightArmRef.current.rotation.x = 0;
-      if (torsoRef.current) torsoRef.current.position.y = 0.95 + Math.sin(t * 2) * 0.02;
+      if (torsoRef.current) torsoRef.current.position.y = 0.95 + Math.sin(t * 1.5) * 0.008;
     }
   });
 

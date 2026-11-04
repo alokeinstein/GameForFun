@@ -112,13 +112,30 @@
 ### Feature: Clean Decoupled Kinematic Character Controller & Jump Physics
 - **Status:** Implemented (Upgraded)
 - **Purpose:** Responsive third-person navigation with strict mathematical decoupling of horizontal movement and vertical physics.
-- **Behaviour:** WASD movement calculated relative to camera forward projected onto the horizontal XZ plane ($y=0$). W/A/S/D keys never affect vertical velocity. Spacebar triggers a crisp upward vertical jump ($v_y = 7.2\text{ m/s}$) with downward raycast ground detection. Zero vertical teleportation on network updates; natural Rapier gravity ($g = -19.2\text{ m/s}^2$) and zero-friction capsule collider.
+- **Behaviour:** WASD movement calculated relative to dynamic camera heading projected onto the horizontal XZ plane ($y=0$). W/A/S/D keys never affect vertical velocity. Spacebar triggers a crisp upward vertical jump ($v_y = 7.2\text{ m/s}$) with downward raycast ground detection. Zero vertical teleportation on network updates; natural Rapier gravity ($g = -19.2\text{ m/s}^2$) and zero-friction capsule collider.
+
+### Feature: Continuous Sprinting & Ground Clamping (No Sprint Jumping)
+- **Status:** Implemented
+- **Purpose:** Reliable high-speed horizontal sprinting without Rapier contact-solver bouncing or unwanted jumping.
+- **Behaviour:** Holding `Shift` increases speed from $4.2\text{ m/s}$ to $8.5\text{ m/s}$ purely on horizontal axes ($x, z$). When grounded and not jumping, vertical velocity is clamped to $-0.6\text{ m/s}$, suppressing numerical contact-bounce micro-impulses and keeping the player glued to the ground during sprint. Jumping is strictly isolated to the Spacebar.
+
+### Feature: GTA-Style Mouse Orbit Camera & Camera-Relative Movement
+- **Status:** Implemented
+- **Purpose:** Intuitive, modern third-person camera control inspired by GTA Vice City and competitive multiplayer games.
+- **Behaviour:** Mouse movement orbits camera smoothly around player with spherical coordinates (`cameraYaw`, `cameraPitch` clamped to $[-0.2, 1.2]$ rad). Mouse wheel adjusts distance ($3.2\text{m} - 13.0\text{m}$). WASD movement vectors are dynamically calculated relative to current camera heading ($\mathbf{F}_{\text{cam}}, \mathbf{R}_{\text{cam}}$). Moving the mouse while stationary orbits freely without spinning the character.
+- **Important notes:** Integrated with Pointer Lock API. Clicking canvas locks cursor; pressing `ESC` releases cursor instantly; clicking HUD buttons, chat, and modals automatically ignores pointer lock.
+
+### Feature: Vertical Camera Stabilization & Zero-Bobbing Tracking
+- **Status:** Implemented
+- **Purpose:** Stable, jitter-free third-person tracking during walking, continuous sprinting, and camera rotation.
+- **Behaviour:** Camera target point uses smoothed exponential lerp with dedicated vertical low-pass filtering (`focusTarget.current.y = lerp(..., 0.08)`). Character torso oscillation is decoupled from camera tracking, preserving natural limb swing animations while eliminating all scene-shaking head-bob artifacts.
+- **Important notes:** Fully isolated per client in multiplayer sessions.
 
 ### Feature: Docked Top-0 HUD & In-Game UI Cleanliness
 - **Status:** Implemented (Upgraded)
 - **Purpose:** Eliminate double navbars and provide an unobstructed 3D viewport.
-- **Behaviour:** Redundant global navbar removed from active gameplay. Sleek, compact top bar docked directly at `top-0` (67px) containing brand emblem, round badge, phase title & countdown, survivor tally, living status pill, Dossier view toggle, WebRTC mic button, and SFX volume.
-- **Important notes:** Controls hint banner (`WASD: Move • Shift: Sprint • Space: Jump • M: Mic`) and collapsible Town Chat widget floating cleanly.
+- **Behaviour:** Redundant global navbar removed from active gameplay. Sleek, compact top bar docked directly at `top-0` (67px) containing brand emblem, round badge, phase title & countdown, survivor tally, living status pill, Dossier view toggle, WebRTC mic button, and SFX volume. Center HUD hint indicates `"Click viewport to look around • ESC to release mouse"`.
+- **Important notes:** Controls hint banner (`WASD: Move • Shift: Sprint • Space: Jump • Mouse: Look • ESC: Release`) and collapsible Town Chat widget floating cleanly.
 
 ### Feature: Networked Transform Synchronization (20 Hz + Lerp)
 - **Status:** Implemented

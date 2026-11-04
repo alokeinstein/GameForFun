@@ -1,0 +1,23 @@
+{
+  "testA_cameraStability": true,
+  "testB_sprintNoJump": true,
+  "testB_spaceJumpWorks": true,
+  "testC_mouseOrbit": true,
+  "testC_cameraRelativeMovement": true,
+  "testC_pointerLockEscape": true,
+  "testD_multiplayerSync": true,
+  "fps": 61,
+  "screenshots": [
+    "01_gta_start.png",
+    "02_walking_forward.png",
+    "03_continuous_sprint.png",
+    "04_space_jump_apex.png",
+    "05_space_jump_landed.png",
+    "06_mouse_look_left.png",
+    "07_mouse_look_right.png",
+    "08_mouse_pitch.png",
+    "09_camera_relative_movement.png",
+    "10_escape_hud_accessible.png",
+    "11_player2_multiplayer_view.png"
+  ]
+}
