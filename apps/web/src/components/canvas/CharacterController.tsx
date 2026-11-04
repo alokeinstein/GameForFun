@@ -242,22 +242,59 @@ export function CharacterController({ room, player, isHost = false }: CharacterC
     const targetVelX = isMoving ? moveDir.x * currentSpeed : currentVel.x * 0.7;
     const targetVelZ = isMoving ? moveDir.z * currentSpeed : currentVel.z * 0.7;
 
-    // 2. Downward Raycast Ground Detection
+    // 2. High-Fidelity Downward Raycast Ground Detection & Ground Snapping
     let isGrounded = false;
+    let groundClearance = 0;
     try {
-      const rayOrigin = { x: translation.x, y: translation.y + 0.3, z: translation.z };
+      // Ray casts downwards from mid-body (y + 0.40) to detect walkable surface directly beneath capsule
+      // Capsule bottom is at y + 0.0 (center at y=0.9, halfHeight=0.55, radius=0.35 -> 0.9 - 0.55 - 0.35 = 0.0)
+      // Distance from rayOrigin (y + 0.40) to capsule bottom is exactly 0.40m
+      const rayOrigin = { x: translation.x, y: translation.y + 0.4, z: translation.z };
       const rayDir = { x: 0, y: -1, z: 0 };
       const ray = new rapier.Ray(rayOrigin, rayDir);
       const playerCollider = rb.collider(0);
-      const hit = world.castRay(ray, 0.48, true, undefined, undefined, playerCollider);
-      if (hit !== null && hit.timeOfImpact <= 0.42) {
-        isGrounded = Math.abs(currentVel.y) < 1.8;
+      const hit = world.castRay(ray, 0.95, true, undefined, undefined, playerCollider);
+      if (hit !== null) {
+        // Clearance relative to capsule bottom (feet)
+        // positive = capsule bottom is above ground; negative = slightly penetrating
+        groundClearance = hit.timeOfImpact - 0.4;
+        if (groundClearance >= -0.08 && groundClearance <= 0.14) {
+          isGrounded = Math.abs(currentVel.y) < 2.0;
+        }
       }
     } catch {
       isGrounded = translation.y <= 0.45 && Math.abs(currentVel.y) < 0.5;
     }
 
-    // 3. Vertical Velocity & Jumping: SPRINT MUST NEVER CAUSE JUMPING
+    // 2b. Forward Step-Climbing Detection (Smoothly traverses sidewalk curbs, dais, and steps <= 0.35m)
+    let isClimbingStep = false;
+    if (isMoving && isGrounded && !isJumping.current) {
+      try {
+        const playerCollider = rb.collider(0);
+        // Cast forward probe ray at low foot level (y + 0.08)
+        const footRayOrigin = { x: translation.x, y: translation.y + 0.08, z: translation.z };
+        const stepRayDir = { x: moveDir.x, y: 0, z: moveDir.z };
+        const footRay = new rapier.Ray(footRayOrigin, stepRayDir);
+        const footHit = world.castRay(footRay, 0.52, true, undefined, undefined, playerCollider);
+
+        // If a low collision obstacle is detected immediately in front of feet
+        if (footHit !== null && footHit.timeOfImpact <= 0.46) {
+          // Check upper clearance at knee/waist level (y + 0.42)
+          const waistRayOrigin = { x: translation.x, y: translation.y + 0.42, z: translation.z };
+          const waistRay = new rapier.Ray(waistRayOrigin, stepRayDir);
+          const waistHit = world.castRay(waistRay, 0.52, true, undefined, undefined, playerCollider);
+
+          // If upper ray is clear or significantly farther than foot hit, this is a climbable step/curb/ramp
+          if (waistHit === null || waistHit.timeOfImpact > footHit.timeOfImpact + 0.12) {
+            isClimbingStep = true;
+          }
+        }
+      } catch {
+        // Fallback without step assist
+      }
+    }
+
+    // 3. Vertical Velocity, Step Assist & Ground Clamping: SPRINT MUST NEVER CAUSE JUMPING
     let targetVelY = currentVel.y;
 
     if (keys.current.jump && isGrounded && canJump.current && !isJumping.current) {
@@ -274,16 +311,22 @@ export function CharacterController({ room, player, isHost = false }: CharacterC
       if (isGrounded && currentVel.y <= 0.05) {
         // Landed cleanly
         isJumping.current = false;
-        targetVelY = -0.6; // Snap to ground
+        targetVelY = -0.6; // Clamp firmly to ground
       }
+    } else if (isClimbingStep) {
+      // Controlled step assist for curbs, dais, and low stairs
+      targetVelY = 2.8;
     } else if (isGrounded) {
       // Grounded during walking or sprinting:
-      // Clamp vertical velocity to a constant small downward velocity (-0.6 m/s)
-      // This FIRMLY sticks the capsule to the ground, completely eliminating solver micro-bounces
-      // and preventing the character from ever jumping automatically when sprinting!
+      // Clamp vertical velocity to -0.6 m/s to firmly adhere capsule to terrain and slopes,
+      // completely eliminating solver bounce impulses
       targetVelY = -0.6;
+    } else if (groundClearance > 0.14 && groundClearance <= 0.45 && !isJumping.current && currentVel.y <= 0.2) {
+      // Stepping down a small curb, step or descending a slope: snap downwards firmly
+      // instead of floating in the air
+      targetVelY = -3.2;
     } else {
-      // Falling naturally off a ledge
+      // Falling naturally off a high ledge
       targetVelY = currentVel.y;
     }
 
@@ -348,8 +391,8 @@ export function CharacterController({ room, player, isHost = false }: CharacterC
     const camY = focusTarget.current.y + dist * sinPitch;
     const camZ = focusTarget.current.z + dist * cosPitch * Math.cos(yaw);
 
-    // Clamp camera above ground surface
-    const safeCamY = Math.max(0.45, camY);
+    // Clamp camera above terrain surface relative to player elevation
+    const safeCamY = Math.max(focusTarget.current.y - 0.7, Math.max(0.45, camY));
 
     state.camera.position.set(camX, safeCamY, camZ);
     state.camera.lookAt(focusTarget.current.x, focusTarget.current.y, focusTarget.current.z);

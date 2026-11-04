@@ -4,6 +4,7 @@ import { PlayerState } from "./PlayerState.js";
 import { GameConfigState } from "./GameConfigState.js";
 
 export class MafiaRoomState extends Schema {
+  @type("string") gameMode: string = "MAFIA";
   @type("string") roomCode: string = "";
   @type("string") phase: string = Phase.WAITING_FOR_PLAYERS;
   @type("number") phaseStartedAt: number = 0;

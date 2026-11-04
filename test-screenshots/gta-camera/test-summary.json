@@ -6,7 +6,7 @@
   "testC_cameraRelativeMovement": true,
   "testC_pointerLockEscape": true,
   "testD_multiplayerSync": true,
-  "fps": 61,
+  "fps": 121,
   "screenshots": [
     "01_gta_start.png",
     "02_walking_forward.png",

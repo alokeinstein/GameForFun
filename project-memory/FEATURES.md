@@ -188,3 +188,196 @@
 - **Status:** Implemented
 - **Purpose:** Seamless containerized deployment of PostgreSQL 16, Colyseus Game Server, and Next.js Web App.
 - **Behaviour:** Multi-stage Dockerfiles (`apps/game-server/Dockerfile`, `apps/web/Dockerfile`) orchestrated via root `docker-compose.yml`.
+
+
+---
+
+## 7. Multi-Game Platform Expansion (Milestone M0)
+
+### Feature: Forward Step-Climbing Assistance
+- **Status:** Implemented
+- **Purpose:** Enable characters to naturally walk up curbs, steps, and elevated platforms up to $0.35$m high without getting stuck on vertical collision faces or requiring manual jumps.
+- **Behaviour:** Dual-ray forward probe in `CharacterController.tsx` (`y + 0.08` foot probe and `y + 0.42` knee/waist clearance probe). When a low obstacle with clear upper space is encountered while moving forward, a smooth vertical step impulse ($v_y = 2.8\text{ m/s}$) lifts the capsule over the ledge.
+- **Important notes:** Verified in browser automation across sidewalks, curbs, and dais.
+
+### Feature: Downward Ground Snapping & Clearance Evaluation
+- **Status:** Implemented
+- **Purpose:** Eliminate mid-air floating when characters step down ledges, curbs, or descend slopes.
+- **Behaviour:** High-fidelity downward raycast (`y + 0.40` downwards) measures exact clearance relative to capsule bottom. If clearance is between $0.14$m and $0.45$m during non-jump descent, downward snap velocity ($-3.2\text{ m/s}$) firmly attaches the character to the descending terrain.
+- **Important notes:** Clamps vertical velocity to $-0.6\text{ m/s}$ when grounded, maintaining smooth sprinting without hops.
+
+### Feature: Expanded 152m x 152m Urban Map
+- **Status:** Implemented
+- **Purpose:** Provide a significantly larger, coherent urban game environment with distinct districts, natural terrain elevations, and solid Rapier colliders.
+- **Behaviour:** Contains Zone A Central Park (dais with solid cylinder collider, 4 approach ramps, obelisk, 28 trees, 20 lamps), Dedicated Multi-Tier Elevation Pavilion ($+0.60$m terrace, $8.5^\circ$ ramp, 3-step stairs), Zone B City Streets & Sidewalks (asphalt roads, markings, $+0.14$m raised sidewalks with cuboid colliders), Zone C Commercial Boulevard (12 buildings with awnings/props), Zone D Residential District (12 brownstones/apartments), and boundary walls at $\pm 76$m. Server boundary clamping in `MafiaRoom.ts` expanded to $[-85, 85]$.
+- **Important notes:** Verified at 121 FPS across 3 connected clients in `scripts/terrain-grounding-browser-test.mjs`.
+
+---
+
+## 8. Multi-Game Platform Expansion (Milestone M1)
+
+### Feature: Post-Room-Creation Dual-Game Selection Screen
+- **Status:** Implemented
+- **Purpose:** Present room creators with an intuitive, modern UI to pick between MAFIA 3D and SHOOTING GAME upon room generation.
+- **Behaviour:** Renders two high-impact cards (`GameSelectionScreen.tsx`) with game badges, player capacities (3–20 vs 2–24), game descriptions, and feature tags. Host clicking a card dispatches game mode selection and routes clients to the appropriate lobby.
+- **Important notes:** Preserves identical 5-character room code format and single-room URL scheme (`/lobby/[roomCode]`). Non-host players joining an unselected room see an informative waiting banner.
+
+### Feature: Colyseus Multi-Game Room Engine & Metadata Router
+- **Status:** Implemented
+- **Purpose:** Provide complete state and logic isolation between game modes while sharing server infrastructure.
+- **Behaviour:** Colyseus server registers `shooting_room` alongside `mafia_room` filtered by `roomCode`. HTTP inquiry endpoint `/api/rooms/:roomCode` inspects active instances across both room types and returns authoritative `gameMode`, allowing connecting clients to instantly route to the correct room without guesswork.
+- **Important notes:** Complete isolation prevents cross-game state pollution. Mafia room rules never run in Shooting rooms, and vice versa.
+
+### Feature: Multi-Team Shooting Lobby & Match Settings Isolation
+- **Status:** Implemented
+- **Purpose:** Dedicated pre-game lobby for the Shooting Game with multi-team assignment and match customization.
+- **Behaviour:** Displays 3 distinct team rosters: Team Red (`#ef4444`), Team Blue (`#3b82f6`), and Team Green (`#10b981`). Players can click to join available teams; room host has administrative controls to reassign players to balance rosters. Host can configure match duration (3–15 min), score limit (15–75 kills), combat map, and respawn delay.
+- **Important notes:** Completely isolates game settings. Mafia settings (mafia ratio, voting duration, dev mode) are never shown in shooting lobbies.
+
+### Feature: Authoritative Shooting State Machine & Match Lifecycle
+- **Status:** Implemented
+- **Purpose:** Authoritative lifecycle management for multiplayer combat sessions.
+- **Behaviour:** `ShootingRoomState` manages transition through `LOBBY` $\rightarrow$ `COUNTDOWN` $\rightarrow$ `ACTIVE` $\rightarrow$ `MATCH_OVER`. Scores, timer countdowns, and winning team evaluation are computed server-side. Host can issue `RESET_TO_LOBBY` to return all connected players to the lobby for rematches.
+- **Important notes:** Verified with 3 integration tests in `ShootingRoom.test.ts` and 7 browser automation tests in `scripts/multi-game-browser-test.mjs`.
+
+---
+
+## 9. Multi-Game Platform Expansion (Milestone M2)
+
+### Feature: Extensible Weapons Catalog & Hit Region Configuration
+- **Status:** Implemented
+- **Purpose:** Centralized, declarative weapon database and body-part hit region multipliers for server-authoritative combat.
+- **Behaviour:** `WEAPONS_CATALOG` defines 5 balanced weapon archetypes:
+  1. `assault_rifle`: M4-A1 (32 dmg, 10 Hz, 30 mag, 120 reserve, 65m range, 0.035 recoil)
+  2. `shotgun`: Tactical Pump Shotgun (18 dmg x 8 pellets = 144 burst, 1.2 Hz, 8 mag, 32 reserve, 25m range)
+  3. `sniper_rifle`: AWM Heavy Sniper (85 dmg, 2.2x headshot multiplier, 0.8 Hz, 5 mag, 25 reserve, 140m range)
+  4. `smg`: Vector Rapid SMG (22 dmg, 14 Hz, 35 mag, 140 reserve, 40m range, tight hipfire)
+  5. `pistol`: Desert Eagle .50 (28 dmg, 4 Hz, 12 mag, 60 reserve, 35m range)
+  - Hit region multipliers: Head (2.0x), Upper Torso (1.0x), Abdomen (0.85x), Arms (0.65x), Legs (0.60x).
+- **Important notes:** Fully decoupled from character controller; easily extensible for future weapons without rewriting mechanics.
+
+### Feature: Pre-Match Weapon Loadout Selection & Sync
+- **Status:** Implemented
+- **Purpose:** Allow players to customize their primary combat weapon in the shooting lobby before entering battle.
+- **Behaviour:** Renders 5 interactive weapon cards in `ShootingLobby.tsx` displaying weapon icon, category, description, and key stat bars. Clicking an unequipped weapon dispatches `SHOOTING_SELECT_LOADOUT`; server updates `player.weaponId`, `ammo`, and `maxAmmo`, and synchronizes state to all clients.
+- **Important notes:** Player weapon preferences are displayed next to their name in the team roster so teammates can coordinate roles (e.g. Snipers vs CQC Shotguns).
+
+### Feature: Host Auto-Balance Teams & Team Renaming
+- **Status:** Implemented
+- **Purpose:** Ensure balanced team sizes with one click and allow custom team branding.
+- **Behaviour:** Host can click "Auto-Balance Teams" (`SHOOTING_AUTO_BALANCE`) to round-robin distribute all connected players evenly across active teams (`team-red`, `team-blue`, `team-green`). Host can also click the edit button on any team card (`SHOOTING_RENAME_TEAM`) to rename teams (e.g. "Crimson Wolves").
+- **Important notes:** Verified with 4 integration tests in `ShootingRoom.test.ts` and 6 browser automation tests in `scripts/shooting-lobby-browser-test.mjs`.
+
+---
+
+## 10. Multi-Game Platform Expansion (Milestone M3)
+
+### Feature: Dedicated 3D Urban Combat Shooting Arena (`ShootingMap.tsx`)
+- **Status:** Implemented
+- **Purpose:** Provide a dedicated, competitive $160\text{m} \times 160\text{m}$ battlefield engineered specifically for fast-paced multiplayer shooting with multiple elevation tiers.
+- **Behaviour:**
+  - Team Red, Team Blue, and Team Green spawn bases with elevated pads ($+0.25$m), team colored floodlights, sandbag walls, and flags.
+  - Central Abandoned Warehouse ($32\text{m} \times 24\text{m}$, height $7.5$m) with 4 open doorways, ground floor cover crates, and an elevated interior catwalk ($+3.5$m elevation) accessible via two inclined industrial staircases.
+  - Shipping Container Flanking Maze with 11 stacked containers and sloped metal ramps leading to walkable container roofs ($+2.6$m).
+  - Two elevated sniper watchtowers ($+5.2$m elevation) with access ramps and chest-high sandbag parapets.
+  - Street network with 18 concrete Jersey barriers, 3 armored tactical trucks, and 6 floodlight poles.
+- **Important notes:** Every walking surface (floors, ramps, stair treads, catwalks, container roofs) and barrier has a matching 1:1 Rapier WASM physical collider.
+
+### Feature: 3D Shooting Player Controller & Team Avatars
+- **Status:** Implemented
+- **Purpose:** Full third-person character navigation and visual representation for the shooting game.
+- **Behaviour:** `ShootingCharacterController.tsx` provides mouse aiming, pointer lock, camera-relative WASD steering, Spacebar jump ($v_y = 7.4\text{ m/s}$), and forward step-climbing assist. `ShootingCharacterAvatar.tsx` renders tactical combat uniforms with team colors, helmets, visors, overhead nameplates with health bars, and 3D weapon models held in hand (Rifle, Shotgun, Sniper, SMG, Pistol).
+- **Important notes:** Spawns players authoritatively in their team's designated base (Red, Blue, Green).
+
+### Feature: 2D Tactical Combat HUD Overlay (`ShootingCombatHUD.tsx`)
+- **Status:** Implemented
+- **Purpose:** Provide a high-visibility, clean competitive combat interface during active shooting matches.
+- **Behaviour:** Docked top banner displays Team Deathmatch status, live team score tracks, match countdown timer, and kill limit. Center viewport features an aiming crosshair. Bottom-left HUD displays team identity, real-time health bar (100 HP), and shield bar (50 Shield). Bottom-right widget displays equipped weapon name, category, emoji, and magazine ammo counter. Includes host "Return to Lobby" action.
+- **Important notes:** Verified across 6 real-browser tests in `scripts/shooting-map-browser-test.mjs`.
+
+---
+
+## 12. Multi-Game Platform Expansion (Milestone M6: Match Progression & Post-Match Podium)
+
+### Feature: Authoritative Match Progression & Win Conditions
+- **Status:** Implemented
+- **Purpose:** Reliable match progression and termination across score limits, duration expiration, and draws.
+- **Behaviour:** 
+  - Server transitions room status from `ACTIVE` to `MATCH_OVER` when a team reaches `config.scoreLimit` or when `matchDurationSec` timer expires.
+  - Automatically clears all combat timers (reload, respawn, match countdown) and locks all combat actions.
+  - Determines winner or detects draw if scores are equal.
+- **Important notes:** Unit tested in `ShootingMatchLoop.test.ts`.
+
+### Feature: Post-Match Victory Podium & Accolades Breakdown (`ShootingPostMatchScreen.tsx`)
+- **Status:** Implemented
+- **Purpose:** Cinematic celebration of the winning squad, performance recognition, and comprehensive leaderboard.
+- **Behaviour:**
+  - Header displays victory banner for winning team with team color glow, or draw announcement.
+  - Procedural victory fanfare (triumphant C-major) for winners; somber defeat stinger for losers.
+  - Accolades highlight cards: MVP (highest total score), Top Fragger (most eliminations), Sharpshooter (highest headshot count).
+  - Team breakdown cards displaying total squad score and surviving player count.
+  - Full match leaderboard table ranking combatants by Score, Kills, Deaths, K/D ratio, Damage dealt, and Headshots.
+  - Host "Rematch / Return to Lobby" control (`RESET_TO_LOBBY`) that cleanly resets all player vitals, scores, and team counts, returning room to `LOBBY`.
+- **Important notes:** Verified with 6 browser automation test suites in `shooting-postmatch-browser-test.mjs`.
+
+---
+
+## 13. Multi-Game Platform Expansion (Milestone M7: Scaling & Security Validation)
+
+### Feature: Anti-Cheat & Input Sanitization Validation
+- **Status:** Implemented
+- **Purpose:** Protect against coordinate tampering, speedhacks, rapid fire flood injection, and state exploits.
+- **Behaviour:**
+  - Position clamping restricts client coordinates strictly to $[-85, 85]$ horizontally and $[-5, 30]$ vertically; non-finite payloads (`NaN`, `Infinity`) are rejected.
+  - Rate-of-fire validation rejects fire spam flood attacks; cooldown injection cannot bypass weapon fire intervals.
+  - Mid-combat loadout switching is prohibited while alive, preventing instant ammo reload or gun switching exploits.
+  - Friendly fire validation strictly prevents teammates from damaging each other when disabled.
+  - Dead players cannot shoot; dead players cannot be repeatedly damaged during respawn delay.
+  - Private cryptographic reconnection tokens preserve full combat state upon rejoin.
+- **Important notes:** Verified by 6 test suites in `ShootingSecurityAndScaling.test.ts`.
+
+### Feature: High-Concurrency Multiplayer Scaling (16 Players)
+- **Status:** Implemented
+- **Purpose:** Validate that the room system supports dynamic, large multiplayer matches beyond 4 players without performance degradation.
+- **Behaviour:**
+  - Scaled concurrency test harness in `scripts/shooting-stress-test.mjs` runs 16 concurrent headless players in a single `ShootingRoom`.
+  - Simulates simultaneous 20Hz movement streaming, circular patrol navigation, and high-frequency crossfire combat.
+  - Measured metrics: Average patch latency **65.45 ms**, median latency **62.00 ms**, 95th percentile latency **65.00 ms**, with 2,103 state patches and 4,352 muzzle flashes synchronized with 0 errors.
+
+---
+
+## 14. Multi-Game Platform Expansion (Milestone M8: Visual Polish & Sound Design)
+
+### Feature: Tactical 3D Sky Dome & Atmospheric Environment
+- **Status:** Implemented
+- **Purpose:** Provide a visually compelling, atmospheric competitive combat environment without expensive heavy textures.
+- **Behaviour:**
+  - Dynamic celestial twilight dome (`#0c1322` to `#1e293b`) with horizon fog.
+  - 24 procedural distant building silhouettes generating an urban skyline at $r = 110$m.
+  - High-altitude sun/moon sphere (`#fef08a`) casting tactical directional shadows.
+
+### Feature: 3D Combat Visual Effects (`ShootingCombatVFX.tsx`)
+- **Status:** Implemented
+- **Purpose:** Immersive 3D feedback for all combat interactions across local and remote players.
+- **Behaviour:**
+  - Dynamic muzzle flash point light pulse and flare on every shot.
+  - High-velocity luminous bullet tracers connecting gun muzzle to target trajectory.
+  - 3D surface impact sparks and character hit flares.
+  - 3D floating damage indicators above victim heads with `-32` or `💥 -64 HEAD` headshot alerts and upward float/fade.
+
+### Feature: Extended Procedural Zero-Asset Audio Engine (`combatAudio.ts`)
+- **Status:** Implemented
+- **Purpose:** Full sensory acoustic feedback without external asset dependencies.
+- **Behaviour:**
+  - Weapon-specific gunshots for all 5 archetypes.
+  - Empty clip dry-fire click sound.
+  - Kinetic jump thrust / whoosh audio.
+  - Surface impact / bullet spark audio.
+  - Hitmarker chirps (crisp 1750Hz headshot vs 1100Hz body hit).
+  - Mechanical reload sequence and kill-confirmed chime.
+  - Triumphant C-major victory fanfare and somber defeat stinger.
+- **Important notes:** Verified across 7 multi-client staging browser tests in `scripts/shooting-staging-browser-test.mjs`.
+
+
+
+

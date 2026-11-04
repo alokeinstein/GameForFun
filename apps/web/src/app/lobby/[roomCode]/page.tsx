@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Room } from "colyseus.js";
 import {
   Users,
@@ -19,22 +19,36 @@ import {
   UserCheck,
   Radio,
   Wifi,
-  WifiOff
+  WifiOff,
+  Crosshair,
+  Trophy,
+  RotateCcw
 } from "lucide-react";
 import {
+  GameMode,
   ClientMessageType,
   ServerMessageType,
   MafiaRoomState,
   PlayerState,
+  ShootingRoomState,
+  ShootingPlayerState,
+  ShootingTeamState,
   ChatMessagePayload
 } from "@mafia/shared";
 import { calculateRoleCounts } from "@mafia/game-rules";
 import {
   joinOrCreateMafiaRoom,
+  joinOrCreateShootingRoom,
+  queryRoomInfo,
   getSavedPlayerName,
   saveReconnectionToken
 } from "../../../services/colyseus";
 import { GameHUD } from "../../../components/game/GameHUD";
+import { GameSelectionScreen } from "../../../components/game/GameSelectionScreen";
+import { ShootingLobby } from "../../../components/game/ShootingLobby";
+import { ShootingGameScene } from "../../../components/canvas/ShootingGameScene";
+import { ShootingCombatHUD } from "../../../components/game/ShootingCombatHUD";
+import { ShootingPostMatchScreen } from "../../../components/game/ShootingPostMatchScreen";
 
 interface ChatItem {
   id: string;
@@ -46,20 +60,25 @@ interface ChatItem {
 
 export default function LobbyPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const roomCode = ((params.roomCode as string) || "").toUpperCase();
 
-  const [room, setRoom] = useState<Room<MafiaRoomState> | null>(null);
-  const [sessionId, setSessionId] = useState<string>("");
-  const [players, setPlayers] = useState<PlayerState[]>([]);
-  const [isHost, setIsHost] = useState(false);
-  const [isReady, setIsReady] = useState(false);
-  const [phase, setPhase] = useState("WAITING_FOR_PLAYERS");
-  const [roundNumber, setRoundNumber] = useState(1);
-  const [phaseStartedAt, setPhaseStartedAt] = useState(0);
-  const [phaseEndsAt, setPhaseEndsAt] = useState(0);
-  const [winningTeam, setWinningTeam] = useState("");
-  const [config, setConfig] = useState({
+  // Active Game Mode
+  const [activeGameMode, setActiveGameMode] = useState<GameMode>(GameMode.UNSELECTED);
+
+  // Mafia Room State
+  const [mafiaRoom, setMafiaRoom] = useState<Room<MafiaRoomState> | null>(null);
+  const [mafiaSessionId, setMafiaSessionId] = useState<string>("");
+  const [mafiaPlayers, setMafiaPlayers] = useState<PlayerState[]>([]);
+  const [mafiaIsHost, setMafiaIsHost] = useState(false);
+  const [mafiaIsReady, setMafiaIsReady] = useState(false);
+  const [mafiaPhase, setMafiaPhase] = useState("WAITING_FOR_PLAYERS");
+  const [mafiaRoundNumber, setMafiaRoundNumber] = useState(1);
+  const [mafiaPhaseStartedAt, setMafiaPhaseStartedAt] = useState(0);
+  const [mafiaPhaseEndsAt, setMafiaPhaseEndsAt] = useState(0);
+  const [mafiaWinningTeam, setMafiaWinningTeam] = useState("");
+  const [mafiaConfig, setMafiaConfig] = useState({
     mafiaPercentage: 20,
     nightDurationSec: 30,
     discussionDurationSec: 120,
@@ -68,6 +87,26 @@ export default function LobbyPage() {
     isDevMode: false
   });
 
+  // Shooting Room State
+  const [shootingRoom, setShootingRoom] = useState<Room<ShootingRoomState> | null>(null);
+  const [shootingSessionId, setShootingSessionId] = useState<string>("");
+  const [shootingPlayers, setShootingPlayers] = useState<ShootingPlayerState[]>([]);
+  const [shootingTeams, setShootingTeams] = useState<ShootingTeamState[]>([]);
+  const [shootingIsHost, setShootingIsHost] = useState(false);
+  const [shootingIsReady, setShootingIsReady] = useState(false);
+  const [shootingStatus, setShootingStatus] = useState("LOBBY");
+  const [shootingPhaseStartedAt, setShootingPhaseStartedAt] = useState(0);
+  const [shootingPhaseEndsAt, setShootingPhaseEndsAt] = useState(0);
+  const [shootingWinningTeamId, setShootingWinningTeamId] = useState("");
+  const [shootingConfig, setShootingConfig] = useState({
+    matchDurationSec: 300,
+    scoreLimit: 30,
+    selectedMap: "URBAN_DISTRICT",
+    respawnDelaySec: 3,
+    friendlyFire: false
+  });
+
+  // Common UI State
   const [chatMessages, setChatMessages] = useState<ChatItem[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [copied, setCopied] = useState(false);
@@ -76,54 +115,89 @@ export default function LobbyPage() {
 
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll chat
   useEffect(() => {
     chatScrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
+  // Connect & Mode Routing Lifecycle
   useEffect(() => {
     if (!roomCode) return;
 
-    let activeRoom: Room<MafiaRoomState> | null = null;
     let isSubscribed = true;
+    let activeMafiaRoom: Room<MafiaRoomState> | null = null;
+    let activeShootingRoom: Room<ShootingRoomState> | null = null;
 
-    async function connect() {
+    async function initRoomRouting() {
       try {
         setConnectionStatus("connecting");
         const displayName = getSavedPlayerName() || `Player_${Math.floor(Math.random() * 1000)}`;
-        const r = await joinOrCreateMafiaRoom(roomCode, displayName);
 
+        // Check if query param specifies the game
+        const queryGame = searchParams.get("game")?.toLowerCase();
+
+        // 1. Query server for existing room
+        const roomInfo = await queryRoomInfo(roomCode);
+
+        if (roomInfo) {
+          // Room already exists on server: route directly into its gameMode
+          if (roomInfo.gameMode === GameMode.SHOOTING) {
+            connectToShooting(displayName);
+          } else {
+            connectToMafia(displayName);
+          }
+        } else if (queryGame === "shooting") {
+          // Creator chose Shooting Game
+          connectToShooting(displayName);
+        } else if (queryGame === "mafia") {
+          // Creator chose Mafia 3D
+          connectToMafia(displayName);
+        } else {
+          // Creator hasn't chosen a game yet: show GameSelectionScreen
+          setConnectionStatus("connected");
+          setActiveGameMode(GameMode.UNSELECTED);
+        }
+      } catch (err: any) {
+        console.error("Room routing initialization error:", err);
+        setConnectionStatus("disconnected");
+      }
+    }
+
+    async function connectToMafia(displayName: string) {
+      try {
+        setActiveGameMode(GameMode.MAFIA);
+        setConnectionStatus("connecting");
+        const r = await joinOrCreateMafiaRoom(roomCode, displayName);
         if (!isSubscribed) {
           r.leave();
           return;
         }
 
-        activeRoom = r;
-        setRoom(r);
-        setSessionId(r.sessionId);
+        activeMafiaRoom = r;
+        setMafiaRoom(r);
+        setMafiaSessionId(r.sessionId);
         setConnectionStatus("connected");
 
-        // Sync initial state
-        const updateState = (state: MafiaRoomState) => {
+        // Sync Mafia State
+        const updateMafiaState = (state: MafiaRoomState) => {
           if (!state) return;
-          setPhase(state.phase);
-          setRoundNumber(state.roundNumber || 1);
-          setPhaseStartedAt(state.phaseStartedAt || 0);
-          setPhaseEndsAt(state.phaseEndsAt || 0);
-          setWinningTeam(state.winningTeam || "");
+          setMafiaPhase(state.phase);
+          setMafiaRoundNumber(state.roundNumber || 1);
+          setMafiaPhaseStartedAt(state.phaseStartedAt || 0);
+          setMafiaPhaseEndsAt(state.phaseEndsAt || 0);
+          setMafiaWinningTeam(state.winningTeam || "");
 
           const playerList: PlayerState[] = [];
           state.players.forEach((p) => playerList.push(p));
-          setPlayers([...playerList]);
+          setMafiaPlayers([...playerList]);
 
           const me = state.players.get(r.sessionId);
           if (me) {
-            setIsHost(me.isHost);
-            setIsReady(me.isReady);
+            setMafiaIsHost(me.isHost);
+            setMafiaIsReady(me.isReady);
           }
 
           if (state.config) {
-            setConfig({
+            setMafiaConfig({
               mafiaPercentage: state.config.mafiaPercentage,
               nightDurationSec: state.config.nightDurationSec,
               discussionDurationSec: state.config.discussionDurationSec,
@@ -134,70 +208,135 @@ export default function LobbyPage() {
           }
         };
 
-        r.onStateChange((state) => {
-          updateState(state);
-        });
+        r.onStateChange(updateMafiaState);
 
-        // Listen for private reconnection token
         r.onMessage(ServerMessageType.RECONNECTION_TOKEN, (data: { token: string }) => {
           saveReconnectionToken(roomCode, data.token);
         });
 
-        // Listen for system notifications
         r.onMessage(ServerMessageType.SYSTEM_NOTIFICATION, (data: { message: string }) => {
           setChatMessages((prev) => [
             ...prev,
-            {
-              id: Math.random().toString(),
-              senderName: "SYSTEM",
-              message: data.message,
-              isSystem: true,
-              timestamp: Date.now()
-            }
+            { id: Math.random().toString(), senderName: "SYSTEM", message: data.message, isSystem: true, timestamp: Date.now() }
           ]);
         });
 
-        // Listen for server errors
+        r.onMessage(ServerMessageType.CHAT_MESSAGE, (data: ChatMessagePayload) => {
+          setChatMessages((prev) => [
+            ...prev,
+            { id: Math.random().toString(), senderName: data.senderName, message: data.message, timestamp: data.timestamp }
+          ]);
+        });
+
         r.onMessage(ServerMessageType.ERROR_NOTIFICATION, (data: { message: string }) => {
           setNotification({ text: data.message, type: "error" });
           setTimeout(() => setNotification(null), 5000);
         });
-
-        // Listen for chat messages
-        r.onMessage(ServerMessageType.CHAT_MESSAGE, (data: ChatMessagePayload) => {
-          setChatMessages((prev) => [
-            ...prev,
-            {
-              id: Math.random().toString(),
-              senderName: data.senderName,
-              message: data.message,
-              timestamp: data.timestamp
-            }
-          ]);
-        });
-
-        r.onLeave((code) => {
-          setConnectionStatus("disconnected");
-        });
       } catch (err: any) {
-        console.error("Failed to connect to room:", err);
         setConnectionStatus("disconnected");
-        setNotification({
-          text: err.message || "Failed to connect to multiplayer game server. Ensure server is running.",
-          type: "error"
-        });
+        setNotification({ text: err.message || "Failed to connect to Mafia room.", type: "error" });
       }
     }
 
-    connect();
+    async function connectToShooting(displayName: string) {
+      try {
+        setActiveGameMode(GameMode.SHOOTING);
+        setConnectionStatus("connecting");
+        const r = await joinOrCreateShootingRoom(roomCode, displayName);
+        if (!isSubscribed) {
+          r.leave();
+          return;
+        }
+
+        activeShootingRoom = r;
+        setShootingRoom(r);
+        setShootingSessionId(r.sessionId);
+        setConnectionStatus("connected");
+        if (typeof window !== "undefined") {
+          (window as any).__shootingRoom = r;
+        }
+
+        // Sync Shooting State
+        const updateShootingState = (state: ShootingRoomState) => {
+          if (!state) return;
+          setShootingStatus(state.status || "LOBBY");
+          setShootingPhaseStartedAt(state.phaseStartedAt || 0);
+          setShootingPhaseEndsAt(state.phaseEndsAt || 0);
+          setShootingWinningTeamId(state.winningTeamId || "");
+
+          const playerList: ShootingPlayerState[] = [];
+          state.players.forEach((p) => playerList.push(p));
+          setShootingPlayers([...playerList]);
+
+          const teamList: ShootingTeamState[] = [];
+          state.teams.forEach((t) => teamList.push(t));
+          setShootingTeams([...teamList]);
+
+          const me = state.players.get(r.sessionId);
+          if (me) {
+            setShootingIsHost(me.isHost);
+            setShootingIsReady(me.isReady);
+          }
+
+          if (state.config) {
+            setShootingConfig({
+              matchDurationSec: state.config.matchDurationSec,
+              scoreLimit: state.config.scoreLimit,
+              selectedMap: state.config.selectedMap,
+              respawnDelaySec: state.config.respawnDelaySec,
+              friendlyFire: state.config.friendlyFire
+            });
+          }
+        };
+
+        r.onStateChange(updateShootingState);
+
+        r.onMessage(ServerMessageType.RECONNECTION_TOKEN, (data: { token: string }) => {
+          saveReconnectionToken(roomCode, data.token);
+        });
+
+        r.onMessage(ServerMessageType.SYSTEM_NOTIFICATION, (data: { message: string }) => {
+          setChatMessages((prev) => [
+            ...prev,
+            { id: Math.random().toString(), senderName: "SYSTEM", message: data.message, isSystem: true, timestamp: Date.now() }
+          ]);
+        });
+
+        r.onMessage(ServerMessageType.CHAT_MESSAGE, (data: ChatMessagePayload) => {
+          setChatMessages((prev) => [
+            ...prev,
+            { id: Math.random().toString(), senderName: data.senderName, message: data.message, timestamp: data.timestamp }
+          ]);
+        });
+
+        r.onMessage(ServerMessageType.ERROR_NOTIFICATION, (data: { message: string }) => {
+          setNotification({ text: data.message, type: "error" });
+          setTimeout(() => setNotification(null), 5000);
+        });
+      } catch (err: any) {
+        setConnectionStatus("disconnected");
+        setNotification({ text: err.message || "Failed to connect to Shooting room.", type: "error" });
+      }
+    }
+
+    initRoomRouting();
 
     return () => {
       isSubscribed = false;
-      if (activeRoom) {
-        activeRoom.leave();
-      }
+      if (activeMafiaRoom) activeMafiaRoom.leave();
+      if (activeShootingRoom) activeShootingRoom.leave();
     };
-  }, [roomCode]);
+  }, [roomCode, searchParams]);
+
+  // Host Selects Game Mode from GameSelectionScreen
+  const handleHostSelectGame = (mode: GameMode) => {
+    const displayName = getSavedPlayerName() || `Player_${Math.floor(Math.random() * 1000)}`;
+    if (mode === GameMode.SHOOTING) {
+      router.push(`/lobby/${roomCode}?game=shooting`);
+    } else {
+      router.push(`/lobby/${roomCode}?game=mafia`);
+    }
+  };
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(roomCode);
@@ -205,71 +344,166 @@ export default function LobbyPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleToggleReady = () => {
-    if (room) {
-      room.send(ClientMessageType.READY_TOGGLE);
-    }
+  const handleMafiaReadyToggle = () => {
+    mafiaRoom?.send(ClientMessageType.READY_TOGGLE);
   };
 
-  const handleConfigChange = (patch: Partial<typeof config>) => {
-    if (!room || !isHost) return;
-    const nextConfig = { ...config, ...patch };
-    setConfig(nextConfig);
-    room.send(ClientMessageType.UPDATE_CONFIG, patch);
+  const handleMafiaConfigChange = (delta: Partial<typeof mafiaConfig>) => {
+    mafiaRoom?.send(ClientMessageType.UPDATE_CONFIG, { ...mafiaConfig, ...delta });
   };
 
-  const handleStartGame = () => {
-    if (!room || !isHost) return;
-    room.send(ClientMessageType.START_GAME);
+  const handleMafiaStartGame = () => {
+    mafiaRoom?.send(ClientMessageType.START_GAME);
   };
 
   const handleSendChat = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!room || !chatInput.trim()) return;
-    room.send(ClientMessageType.SEND_CHAT, { message: chatInput.trim() });
+    if (!chatInput.trim()) return;
+
+    if (activeGameMode === GameMode.MAFIA && mafiaRoom) {
+      mafiaRoom.send(ClientMessageType.SEND_CHAT, { message: chatInput.trim() });
+    } else if (activeGameMode === GameMode.SHOOTING && shootingRoom) {
+      shootingRoom.send(ClientMessageType.SEND_CHAT, { message: chatInput.trim() });
+    }
+
     setChatInput("");
   };
 
-  const handleReturnToLobby = () => {
-    if (!room || !isHost) return;
-    room.send(ClientMessageType.RESET_TO_LOBBY);
-  };
-
   const handleLeaveRoom = () => {
-    if (room) {
-      room.leave();
-    }
+    if (mafiaRoom) mafiaRoom.leave();
+    if (shootingRoom) shootingRoom.leave();
     router.push("/");
   };
 
-  // If match has started, render authoritative in-game HUD
-  if (room && phase !== "WAITING_FOR_PLAYERS") {
+  // ---------------------------------------------------------------------------------
+  // RENDER VIEW 1: GAME SELECTION SCREEN (UNSELECTED)
+  // ---------------------------------------------------------------------------------
+  if (activeGameMode === GameMode.UNSELECTED) {
+    return (
+      <GameSelectionScreen
+        roomCode={roomCode}
+        isHost={true}
+        onSelectGame={handleHostSelectGame}
+        onCancel={() => router.push("/")}
+      />
+    );
+  }
+
+  // ---------------------------------------------------------------------------------
+  // RENDER VIEW 2: SHOOTING GAME LOBBY & COMBAT ARENA
+  // ---------------------------------------------------------------------------------
+  if (activeGameMode === GameMode.SHOOTING) {
+    if (shootingRoom && shootingStatus === "ACTIVE") {
+      // 3D Battlefield Arena & Tactical Combat HUD
+      return (
+        <div className="relative w-full h-[100dvh] overflow-hidden bg-noir-950">
+          <ShootingGameScene
+            room={shootingRoom}
+            sessionId={shootingSessionId}
+            players={shootingPlayers}
+            mapName={shootingConfig.selectedMap}
+            isHost={shootingIsHost}
+          />
+
+          <ShootingCombatHUD
+            room={shootingRoom}
+            sessionId={shootingSessionId}
+            players={shootingPlayers}
+            teams={shootingTeams}
+            phaseEndsAt={shootingPhaseEndsAt}
+            scoreLimit={shootingConfig.scoreLimit}
+            selectedMap={shootingConfig.selectedMap}
+            isHost={shootingIsHost}
+            onReturnToLobby={() => shootingRoom.send(ClientMessageType.RESET_TO_LOBBY)}
+            onLeaveRoom={handleLeaveRoom}
+          />
+        </div>
+      );
+    }
+
+    if (shootingRoom && shootingStatus === "MATCH_OVER") {
+      // 3D Battlefield Backdrop & Dedicated Post-Match Victory Podium Screen
+      return (
+        <div className="relative w-full h-[100dvh] overflow-hidden bg-noir-950">
+          <ShootingGameScene
+            room={shootingRoom}
+            sessionId={shootingSessionId}
+            players={shootingPlayers}
+            mapName={shootingConfig.selectedMap}
+            isHost={shootingIsHost}
+          />
+
+          <ShootingPostMatchScreen
+            sessionId={shootingSessionId}
+            players={shootingPlayers}
+            teams={shootingTeams}
+            winningTeamId={shootingWinningTeamId}
+            isHost={shootingIsHost}
+            scoreLimit={shootingConfig.scoreLimit}
+            onReturnToLobby={() => shootingRoom.send(ClientMessageType.RESET_TO_LOBBY)}
+            onLeaveRoom={handleLeaveRoom}
+          />
+        </div>
+      );
+    }
+
+    if (shootingRoom) {
+      return (
+        <ShootingLobby
+          room={shootingRoom}
+          sessionId={shootingSessionId}
+          roomCode={roomCode}
+          players={shootingPlayers}
+          teams={shootingTeams}
+          isHost={shootingIsHost}
+          isReady={shootingIsReady}
+          config={shootingConfig}
+          chatMessages={chatMessages}
+          onSendChat={(msg) => shootingRoom.send(ClientMessageType.SEND_CHAT, { message: msg })}
+          onLeaveRoom={handleLeaveRoom}
+        />
+      );
+    }
+
+    return (
+      <div className="flex-1 flex items-center justify-center text-noir-400 font-mono text-xs">
+        Connecting to Shooting Game Lobby...
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------------
+  // RENDER VIEW 3: MAFIA 3D (ACTIVE GAMEPLAY HUD)
+  // ---------------------------------------------------------------------------------
+  if (mafiaRoom && mafiaPhase !== "WAITING_FOR_PLAYERS") {
     return (
       <GameHUD
-        room={room}
-        sessionId={sessionId}
-        players={players}
-        phase={phase}
-        roundNumber={roundNumber}
-        phaseStartedAt={phaseStartedAt}
-        phaseEndsAt={phaseEndsAt}
-        winningTeam={winningTeam}
-        isHost={isHost}
+        room={mafiaRoom}
+        sessionId={mafiaSessionId}
+        players={mafiaPlayers}
+        phase={mafiaPhase}
+        roundNumber={mafiaRoundNumber}
+        phaseStartedAt={mafiaPhaseStartedAt}
+        phaseEndsAt={mafiaPhaseEndsAt}
+        winningTeam={mafiaWinningTeam}
+        isHost={mafiaIsHost}
         chatMessages={chatMessages}
         onSendChat={(msg) => {
-          room.send(ClientMessageType.SEND_CHAT, { message: msg });
+          mafiaRoom.send(ClientMessageType.SEND_CHAT, { message: msg });
         }}
-        onReturnToLobby={handleReturnToLobby}
+        onReturnToLobby={() => mafiaRoom.send(ClientMessageType.RESET_TO_LOBBY)}
         onLeaveRoom={handleLeaveRoom}
       />
     );
   }
 
-  // Calculate live role counts for display
-  const minRequired = config.isDevMode ? 3 : 5;
-  const canStart = players.length >= minRequired;
-  const roleBreakdown = players.length >= (config.isDevMode ? 3 : 5)
-    ? calculateRoleCounts(players.length, config.mafiaPercentage, config.isDevMode)
+  // ---------------------------------------------------------------------------------
+  // RENDER VIEW 4: MAFIA 3D LOBBY
+  // ---------------------------------------------------------------------------------
+  const minRequired = mafiaConfig.isDevMode ? 3 : 5;
+  const canStart = mafiaPlayers.length >= minRequired;
+  const roleBreakdown = mafiaPlayers.length >= (mafiaConfig.isDevMode ? 3 : 5)
+    ? calculateRoleCounts(mafiaPlayers.length, mafiaConfig.mafiaPercentage, mafiaConfig.isDevMode)
     : null;
 
   return (
@@ -278,7 +512,7 @@ export default function LobbyPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-noir-900 border border-noir-800 rounded-2xl p-4 sm:p-5 shadow-xl">
         <div className="flex items-center space-x-4">
           <div>
-            <div className="text-xs font-mono text-noir-400 uppercase tracking-wider">Room Code</div>
+            <div className="text-xs font-mono text-blood-400 uppercase tracking-wider font-semibold">Mafia 3D Lobby</div>
             <div className="flex items-center space-x-2 mt-0.5">
               <span className="font-mono text-3xl font-black tracking-widest text-white">{roomCode}</span>
               <button
@@ -290,40 +524,24 @@ export default function LobbyPage() {
               </button>
             </div>
           </div>
-          <div className="h-8 w-px bg-noir-800"></div>
+          <div className="h-8 w-px bg-noir-800" />
           <div>
             <div className="text-xs font-mono text-noir-400 uppercase tracking-wider">Players</div>
             <div className="text-xl font-bold text-white mt-0.5 flex items-center space-x-1.5">
               <Users className="w-4 h-4 text-blood-500" />
-              <span>{players.length} Connected</span>
+              <span>{mafiaPlayers.length} Connected</span>
             </div>
           </div>
         </div>
 
         <div className="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-end">
-          <div className="flex items-center space-x-2 text-xs font-mono">
-            {connectionStatus === "connected" && (
-              <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <Wifi className="w-3.5 h-3.5" />
-                <span>SYNCED</span>
-              </span>
-            )}
-            {connectionStatus === "connecting" && (
-              <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                <Radio className="w-3.5 h-3.5 animate-pulse" />
-                <span>CONNECTING...</span>
-              </span>
-            )}
-            {connectionStatus === "disconnected" && (
-              <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-blood-500/10 text-blood-400 border border-blood-500/20">
-                <WifiOff className="w-3.5 h-3.5" />
-                <span>DISCONNECTED</span>
-              </span>
-            )}
-          </div>
+          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono">
+            <Wifi className="w-3.5 h-3.5" />
+            <span>ONLINE</span>
+          </span>
 
           <button
-            onClick={() => router.push("/")}
+            onClick={handleLeaveRoom}
             className="text-xs font-mono text-noir-400 hover:text-white px-3 py-1.5 rounded-lg bg-noir-800 hover:bg-noir-700 transition"
           >
             Leave
@@ -333,13 +551,11 @@ export default function LobbyPage() {
 
       {/* Notifications */}
       {notification && (
-        <div
-          className={`flex items-center space-x-2 p-3 rounded-xl border text-sm font-mono ${
-            notification.type === "error"
-              ? "bg-blood-600/10 border-blood-500/30 text-blood-300"
-              : "bg-noir-800 border-noir-700 text-noir-200"
-          }`}
-        >
+        <div className={`flex items-center space-x-2 p-3 rounded-xl border text-sm font-mono ${
+          notification.type === "error"
+            ? "bg-blood-600/10 border-blood-500/30 text-blood-300"
+            : "bg-noir-800 border-noir-700 text-noir-200"
+        }`}>
           <AlertTriangle className="w-4 h-4 text-blood-400 flex-shrink-0" />
           <span>{notification.text}</span>
         </div>
@@ -352,16 +568,14 @@ export default function LobbyPage() {
           <div className="flex items-center justify-between border-b border-noir-800 pb-3">
             <h2 className="font-bold text-white text-base flex items-center space-x-2">
               <Users className="w-4 h-4 text-blood-500" />
-              <span>Lobby Players ({players.length})</span>
+              <span>Lobby Players ({mafiaPlayers.length})</span>
             </h2>
-            <span className="text-xs font-mono text-noir-400">
-              Min {minRequired} to start
-            </span>
+            <span className="text-xs font-mono text-noir-400">Min {minRequired} to start</span>
           </div>
 
           <div className="space-y-2 flex-1 overflow-y-auto max-h-[380px] pr-1">
-            {players.map((p) => {
-              const isMe = p.id === sessionId;
+            {mafiaPlayers.map((p) => {
+              const isMe = p.id === mafiaSessionId;
               return (
                 <div
                   key={p.id}
@@ -381,12 +595,12 @@ export default function LobbyPage() {
                         {isMe && <span className="text-[10px] font-mono text-blood-400 font-normal">(YOU)</span>}
                         {p.isHost && (
                           <span title="Room Host">
-                            <Crown className="w-3.5 h-3.5 text-gold-500 inline ml-1" />
+                            <Crown className="w-3.5 h-3.5 text-amber-400 inline ml-1" />
                           </span>
                         )}
                       </div>
                       <div className="text-[11px] font-mono text-noir-400">
-                        {p.isConnected ? "Online" : "Reconnecting (60s)"}
+                        {p.isConnected ? "Online" : "Reconnecting"}
                       </div>
                     </div>
                   </div>
@@ -398,8 +612,9 @@ export default function LobbyPage() {
                         <span>Ready</span>
                       </span>
                     ) : (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-noir-800 text-noir-400 text-xs font-mono">
-                        Waiting
+                      <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-noir-800 text-noir-400 text-xs font-mono">
+                        <Clock className="w-3 h-3" />
+                        <span>Waiting</span>
                       </span>
                     )}
                   </div>
@@ -408,94 +623,71 @@ export default function LobbyPage() {
             })}
           </div>
 
-          {/* Player Ready & Host Start Actions */}
-          <div className="pt-3 border-t border-noir-800 space-y-2.5">
+          <div className="pt-2 border-t border-noir-800 flex space-x-3">
             <button
-              onClick={handleToggleReady}
-              className={`w-full py-3 px-4 rounded-xl font-bold text-sm transition flex items-center justify-center space-x-2 ${
-                isReady
-                  ? "bg-noir-800 hover:bg-noir-700 text-noir-200 border border-noir-700"
-                  : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20"
+              onClick={handleMafiaReadyToggle}
+              className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs tracking-wider uppercase transition flex items-center justify-center space-x-2 ${
+                mafiaIsReady
+                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 hover:bg-emerald-500"
+                  : "bg-noir-800 hover:bg-noir-700 text-noir-200"
               }`}
             >
-              <UserCheck className="w-4 h-4" />
-              <span>{isReady ? "Cancel Ready" : "I'm Ready"}</span>
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{mafiaIsReady ? "READY" : "SET READY"}</span>
             </button>
 
-            {isHost && (
+            {mafiaIsHost && (
               <button
-                onClick={handleStartGame}
                 disabled={!canStart}
-                className={`w-full py-3.5 px-4 rounded-xl font-bold text-sm transition flex items-center justify-center space-x-2 ${
-                  canStart
-                    ? "bg-gradient-to-r from-blood-600 to-blood-500 hover:from-blood-500 hover:to-blood-400 text-white shadow-lg shadow-blood-600/30 active:scale-[0.98]"
-                    : "bg-noir-800 text-noir-500 cursor-not-allowed border border-noir-800"
-                }`}
+                onClick={handleMafiaStartGame}
+                className="flex-1 py-3 px-4 bg-gradient-to-r from-blood-600 to-blood-500 hover:from-blood-500 hover:to-blood-400 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl shadow-lg shadow-blood-600/30 flex items-center justify-center space-x-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Play className="w-4 h-4" />
-                <span>
-                  {canStart
-                    ? "Start Game"
-                    : `Need ${minRequired - players.length} more player${
-                        minRequired - players.length > 1 ? "s" : ""
-                      } to start`}
-                </span>
+                <Play className="w-4 h-4 fill-white" />
+                <span>START MATCH</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Right Column: Game Settings & Chat (7 cols) */}
+        {/* Right Column: Settings + Chat (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
-          {/* Game Settings Panel */}
           <div className="bg-noir-900 border border-noir-800 rounded-2xl p-5 space-y-4">
             <div className="flex items-center justify-between border-b border-noir-800 pb-3">
-              <h2 className="font-bold text-white text-base flex items-center space-x-2">
+              <div className="flex items-center space-x-2">
                 <Settings className="w-4 h-4 text-blood-500" />
-                <span>Game Configuration {isHost ? "(Host Controls)" : "(Host Synced)"}</span>
-              </h2>
-              {isHost ? (
-                <span className="text-xs font-mono text-blood-400">Editable by you</span>
-              ) : (
-                <span className="text-xs font-mono text-noir-400">Read-only</span>
-              )}
+                <h3 className="font-bold text-white text-sm">Mafia Game Settings</h3>
+              </div>
+              {!mafiaIsHost && <span className="text-[11px] font-mono text-noir-400">Host Managed</span>}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-              {/* Mafia Percentage */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-mono text-noir-300 flex items-center justify-between">
-                  <span>MAFIA PERCENTAGE</span>
-                  <span className="text-blood-400 font-bold">{config.mafiaPercentage}%</span>
+                  <span>MAFIA RATIO</span>
+                  <span className="font-mono text-blood-400 font-bold">{mafiaConfig.mafiaPercentage}%</span>
                 </label>
-                <div className="flex space-x-1.5">
-                  {[10, 15, 20, 25, 30].map((pct) => (
-                    <button
-                      key={pct}
-                      disabled={!isHost}
-                      onClick={() => handleConfigChange({ mafiaPercentage: pct })}
-                      className={`flex-1 py-1.5 text-xs font-mono font-bold rounded-lg transition ${
-                        config.mafiaPercentage === pct
-                          ? "bg-blood-600 text-white"
-                          : "bg-noir-800 text-noir-300 hover:bg-noir-700 disabled:hover:bg-noir-800"
-                      }`}
-                    >
-                      {pct}%
-                    </button>
-                  ))}
-                </div>
+                <select
+                  disabled={!mafiaIsHost}
+                  value={mafiaConfig.mafiaPercentage}
+                  onChange={(e) => handleMafiaConfigChange({ mafiaPercentage: Number(e.target.value) })}
+                  className="w-full bg-noir-950 border border-noir-700 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-blood-500 disabled:opacity-75"
+                >
+                  <option value={15}>15% (Light)</option>
+                  <option value={20}>20% (Standard)</option>
+                  <option value={25}>25% (High Danger)</option>
+                  <option value={30}>30% (Mayhem)</option>
+                </select>
               </div>
 
-              {/* Night Timer */}
               <div className="space-y-1.5">
                 <label className="text-xs font-mono text-noir-300 flex items-center justify-between">
                   <span>NIGHT DURATION</span>
-                  <span className="font-mono text-white font-bold">{config.nightDurationSec}s</span>
+                  <span className="font-mono text-white font-bold">{mafiaConfig.nightDurationSec}s</span>
                 </label>
                 <select
-                  disabled={!isHost}
-                  value={config.nightDurationSec}
-                  onChange={(e) => handleConfigChange({ nightDurationSec: Number(e.target.value) })}
+                  disabled={!mafiaIsHost}
+                  value={mafiaConfig.nightDurationSec}
+                  onChange={(e) => handleMafiaConfigChange({ nightDurationSec: Number(e.target.value) })}
                   className="w-full bg-noir-950 border border-noir-700 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-blood-500 disabled:opacity-75"
                 >
                   <option value={20}>20 seconds</option>
@@ -505,16 +697,15 @@ export default function LobbyPage() {
                 </select>
               </div>
 
-              {/* Discussion Timer */}
               <div className="space-y-1.5">
                 <label className="text-xs font-mono text-noir-300 flex items-center justify-between">
                   <span>DAY DISCUSSION</span>
-                  <span className="font-mono text-white font-bold">{config.discussionDurationSec}s</span>
+                  <span className="font-mono text-white font-bold">{mafiaConfig.discussionDurationSec}s</span>
                 </label>
                 <select
-                  disabled={!isHost}
-                  value={config.discussionDurationSec}
-                  onChange={(e) => handleConfigChange({ discussionDurationSec: Number(e.target.value) })}
+                  disabled={!mafiaIsHost}
+                  value={mafiaConfig.discussionDurationSec}
+                  onChange={(e) => handleMafiaConfigChange({ discussionDurationSec: Number(e.target.value) })}
                   className="w-full bg-noir-950 border border-noir-700 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-blood-500 disabled:opacity-75"
                 >
                   <option value={60}>60 seconds</option>
@@ -524,16 +715,15 @@ export default function LobbyPage() {
                 </select>
               </div>
 
-              {/* Voting Timer */}
               <div className="space-y-1.5">
                 <label className="text-xs font-mono text-noir-300 flex items-center justify-between">
                   <span>PUBLIC VOTING</span>
-                  <span className="font-mono text-white font-bold">{config.votingDurationSec}s</span>
+                  <span className="font-mono text-white font-bold">{mafiaConfig.votingDurationSec}s</span>
                 </label>
                 <select
-                  disabled={!isHost}
-                  value={config.votingDurationSec}
-                  onChange={(e) => handleConfigChange({ votingDurationSec: Number(e.target.value) })}
+                  disabled={!mafiaIsHost}
+                  value={mafiaConfig.votingDurationSec}
+                  onChange={(e) => handleMafiaConfigChange({ votingDurationSec: Number(e.target.value) })}
                   className="w-full bg-noir-950 border border-noir-700 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-blood-500 disabled:opacity-75"
                 >
                   <option value={20}>20 seconds</option>
@@ -543,32 +733,30 @@ export default function LobbyPage() {
               </div>
             </div>
 
-            {/* Role Reveal & Dev Mode Toggles */}
             <div className="pt-2 border-t border-noir-800 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <label className="flex items-center space-x-2.5 cursor-pointer">
                 <input
                   type="checkbox"
-                  disabled={!isHost}
-                  checked={config.revealRoleOnDeath}
-                  onChange={(e) => handleConfigChange({ revealRoleOnDeath: e.target.checked })}
+                  disabled={!mafiaIsHost}
+                  checked={mafiaConfig.revealRoleOnDeath}
+                  onChange={(e) => handleMafiaConfigChange({ revealRoleOnDeath: e.target.checked })}
                   className="rounded bg-noir-950 border-noir-700 text-blood-600 focus:ring-0 disabled:opacity-75 w-4 h-4"
                 />
-                <span className="text-noir-300">Reveal role upon elimination (Open Grave)</span>
+                <span className="text-noir-300">Reveal role upon elimination</span>
               </label>
 
               <label className="flex items-center space-x-2.5 cursor-pointer">
                 <input
                   type="checkbox"
-                  disabled={!isHost}
-                  checked={config.isDevMode}
-                  onChange={(e) => handleConfigChange({ isDevMode: e.target.checked })}
+                  disabled={!mafiaIsHost}
+                  checked={mafiaConfig.isDevMode}
+                  onChange={(e) => handleMafiaConfigChange({ isDevMode: e.target.checked })}
                   className="rounded bg-noir-950 border-noir-700 text-blood-600 focus:ring-0 disabled:opacity-75 w-4 h-4"
                 />
-                <span className="text-amber-400 font-mono">Dev Testing Mode (Min 3 players)</span>
+                <span className="text-amber-400 font-mono">Dev Mode (Min 3 players)</span>
               </label>
             </div>
 
-            {/* Live Role Preview Banner */}
             {roleBreakdown && (
               <div className="p-3 bg-noir-950 border border-noir-800 rounded-xl flex items-center justify-between text-xs font-mono">
                 <span className="text-noir-400">At current settings:</span>
@@ -586,7 +774,7 @@ export default function LobbyPage() {
             )}
           </div>
 
-          {/* Lobby Real-Time Chat Box */}
+          {/* Lobby Chat */}
           <div className="bg-noir-900 border border-noir-800 rounded-2xl p-5 space-y-3 flex flex-col h-[280px]">
             <div className="flex items-center justify-between border-b border-noir-800 pb-2">
               <h3 className="font-bold text-white text-sm">Lobby Chat</h3>
@@ -606,9 +794,7 @@ export default function LobbyPage() {
                       msg.isSystem ? "text-amber-400/90 font-mono italic" : "text-noir-200"
                     }`}
                   >
-                    {!msg.isSystem && (
-                      <span className="font-bold text-white mr-1.5">{msg.senderName}:</span>
-                    )}
+                    {!msg.isSystem && <span className="font-bold text-white mr-1.5">{msg.senderName}:</span>}
                     <span>{msg.message}</span>
                   </div>
                 ))
@@ -637,4 +823,3 @@ export default function LobbyPage() {
     </div>
   );
 }
-

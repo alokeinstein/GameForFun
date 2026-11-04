@@ -1,13 +1,15 @@
 # Project Context
 
 ## 1. Identity & Vision
-- **Project Name:** MAFIA 3D Multiplayer
-- **Purpose:** A browser-based real-time 3D multiplayer social deduction game based on the classic party game Mafia / Werewolf.
-- **Vision:** Deliver an instant, zero-install, browser-accessible 3D multiplayer experience with the visual clarity of Deadshot.io, smooth 60 FPS performance across modern desktop and mobile browsers, and airtight server-authoritative competitive integrity.
+- **Project Name:** Multi-Game Multiplayer Platform (MAFIA 3D + TEAM SHOOTING GAME)
+- **Purpose:** A browser-based real-time 3D multiplayer gaming platform powered by shared room infrastructure, supporting social deduction (MAFIA 3D) and fast-paced team combat (TEAM SHOOTING GAME).
+- **Vision:** Deliver an instant, zero-install, browser-accessible 3D multiplayer platform with the visual clarity of Deadshot.io, smooth 60+ FPS performance across laptops and integrated graphics, flexible room capacities without arbitrary 4-player limitations, and airtight server-authoritative competitive integrity. Both games share the platform infrastructure (room creation, room codes, invitations, player identity, host privileges, reconnection) while maintaining independent game engines, state machines, and HUDs.
 
 ---
 
-## 2. Core Gameplay Loop
+## 2. Core Gameplay Loops
+
+### 2.1 MAFIA 3D Core Loop
 1. **Lobby:** 5 to 20 players (3 to 20 in Dev Mode) gather via 5-character room codes (e.g. `M8K92`). Host configures timers, Mafia ratio (10-30%), and death reveal settings.
 2. **Role Assignment:** Authoritative server cryptographically shuffles and delivers secret roles privately. Mafia members see their syndicate teammates; Citizens see only their own innocence.
 3. **Night Phase:** The town sleeps. Living Mafia select a citizen target. Strict plurality decides the hit; tied votes produce zero casualties.
@@ -18,6 +20,14 @@
    - **Citizens Win:** When 0 Mafia remain alive.
    - **Mafia Win:** When living Mafia $\ge$ living Citizens (parity reached).
    - Post-game reveal displays the true roles of all players.
+
+### 2.2 TEAM SHOOTING GAME Core Loop
+1. **Shooting Lobby:** Configurable room capacity (tested up to 16+ simultaneous combatants). Players choose their weapon loadout (M4-A1, Shotgun, Heavy Sniper, SMG, Desert Eagle) and join Team Red, Blue, or Green. Host can auto-balance teams, rename squads, or customize match settings.
+2. **Match Deployment:** Players spawn authoritatively at designated team bases within the $160\text{m} \times 160\text{m}$ urban combat arena with 100 Health and 50 Armor Shield.
+3. **Fast-Paced Combat:** Third-person combat controls with pointer lock, camera ADS zoom, server-authoritative rate-of-fire enforcement, and hitscan raycasting with Rapier WASM obstacle occlusion.
+4. **Damage & Scoring:** Server-authoritative hit region multipliers (Head 2.0x, Torso 1.0x, Abdomen 0.85x, Arms 0.65x, Legs 0.60x). Shield absorbs damage first. Eliminating an opponent awards squad points (+150 for headshot, +100 standard) and broadcasts to the real-time kill feed.
+5. **Automated Respawn:** Eliminated players automatically respawn at their team base after a brief cooldown with replenished vitals and ammunition.
+6. **Victory & Podium:** Match terminates when a team achieves the score limit or duration expires. Displays victorious fanfare, MVP, Top Fragger, and Sharpshooter accolades, team standings, and a full combat leaderboard with host rematch return.
 
 ---
 

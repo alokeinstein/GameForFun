@@ -1,6 +1,188 @@
 # Changes Log
 
-## 2026-11-04
+## 2026-11-04 (Multi-Game Platform Expansion - Milestones M6, M7 & M8)
+
+- **Milestone M8 (Visual Polish, Sound Design & Staging Deployment):**
+  - Added: Tactical 3D Sky Dome & Atmosphere in `apps/web/src/components/canvas/ShootingMap.tsx`:
+    - Deep twilight celestial dome (`#0c1322` to `#1e293b`), horizon fog band, and 24 procedural urban building silhouettes creating a distant perimeter skyline at $r = 110$m.
+    - High-altitude sun/moon sphere (`#fef08a`) casting realistic tactical shadows.
+  - Added: 3D Combat Visual Effects in `apps/web/src/components/canvas/ShootingCombatVFX.tsx`:
+    - Dynamic muzzle flash light pulses and flares triggered on `SHOOTING_MUZZLE_FLASH`.
+    - High-velocity luminous bullet tracers connecting gun muzzle to target trajectory.
+    - 3D surface and character bullet impact sparks.
+    - 3D floating damage indicators above victim heads with `-32` or `💥 -64 HEAD` headshot indicators and smooth upward float/fade.
+  - Added: Extended Procedural Audio in `apps/web/src/utils/combatAudio.ts`:
+    - Weapon-specific gunshots for all 5 archetypes (Rifle, Shotgun, Sniper, SMG, Pistol).
+    - Empty magazine dry-fire click sound.
+    - Kinetic jump thrust / whoosh audio.
+    - Surface impact / bullet spark audio.
+    - Hitmarker chirps (crisp 1750Hz headshot vs 1100Hz body hit).
+    - Mechanical reload sequence and kill-confirmed fanfare.
+    - Triumphant C-major victory fanfare and somber defeat stinger.
+  - Added & Verified: Multi-client staging browser automation test in `scripts/shooting-staging-browser-test.mjs` (7 suites): verified room creation, game selection, loadout picking, multi-client peer join, 3D combat arena & HUD, real-time combat exchange, post-match victory podium, and rematch flow. Captured 7 screenshots in `test-screenshots/shooting-staging/`.
+
+- **Milestone M7 (Multiplayer Scaling, Security Validation & Stress Profiling):**
+  - Added: Security hardening and anti-exploit protections in `apps/game-server/src/rooms/ShootingRoom.ts`:
+    - Out-of-bounds coordinate clamping strictly to $[-85, 85]$ horizontally and $[-5, 30]$ vertically; non-finite (`NaN`, `Infinity`) payloads sanitized.
+    - Rate-of-fire cooldown injection prevention: rapid fire flood attacks safely rejected by server authority.
+    - Mid-combat loadout switch exploit prevention: weapon switching prohibited while alive during active match to prevent reload/ammo reset exploits.
+    - Friendly fire validation strictly blocking teammate damage when disabled.
+    - Dead/respawn player combat lockout: dead players cannot fire or receive duplicate damage.
+    - Token-based reconnection: cryptographic session tokens preserve player state across reconnects.
+  - Added: Unit & Security test suite in `apps/game-server/tests/ShootingSecurityAndScaling.test.ts` (6 suites passing).
+  - Added: High-concurrency stress test harness in `scripts/shooting-stress-test.mjs`:
+    - Simulated 16 concurrent combatants in a single `ShootingRoom`.
+    - 2,103 state patches synchronized, 4,352 muzzle flashes, 752 eliminations logged.
+    - Average tick latency **65.45 ms**, median **62.00 ms**, 95th percentile **65.00 ms** (0 crashes, 0 memory leaks).
+
+- **Milestone M6 (Match Progression, Win Conditions & Post-Match Podium):**
+  - Added: Post-match podium and awards overlay in `apps/web/src/components/game/ShootingPostMatchScreen.tsx`:
+    - Dynamic victory banner for winning team with team color glow, or draw announcement.
+    - Procedural victory fanfare (C-major) and defeat stinger.
+    - Accolades highlight cards: MVP, Top Fragger, Sharpshooter.
+    - Comprehensive combat leaderboard table (Rank, Player, Team, Kills, Deaths, K/D, Damage, Score).
+    - Host "Rematch / Return to Lobby" control with clean state reset.
+  - Added: Unit tests in `apps/game-server/tests/ShootingMatchLoop.test.ts` (2 suites passing).
+  - Added: Browser test `scripts/shooting-postmatch-browser-test.mjs` (6 suites passing with 4 screenshots in `test-screenshots/shooting-postmatch/`).
+
+## 2026-11-04 (Multi-Game Platform Expansion - Milestone M4/M5)
+
+- Added: Authoritative combat messages and schemas:
+  - In `packages/shared/src/schema/ShootingPlayerState.ts`: Added `shield` (50), `maxShield` (50), `reserveAmmo` (120), and `isReloading` (false).
+  - In `packages/shared/src/messages.ts`: Added `SHOOTING_FIRE`, `SHOOTING_RELOAD`, `SHOOTING_MUZZLE_FLASH`, `SHOOTING_HIT_EVENT`, `SHOOTING_KILL_FEED`, `SHOOTING_PLAYER_RESPAWNED` and corresponding typed payload interfaces.
+- Added: Server-authoritative combat handlers in `apps/game-server/src/rooms/ShootingRoom.ts`:
+  - `SHOOTING_FIRE`: Rate-of-fire enforcement with 15% network tolerance, ammo deduction, auto-reload trigger when empty, muzzle flash broadcasting.
+  - Multi-tier damage calculation: Hit region multipliers (Head 2.0x, Torso 1.0x, Abdomen 0.85x, Arms 0.65x, Legs 0.60x).
+  - Shield-first absorption: Armor shield absorbs damage first before affecting health.
+  - Friendly fire validation: Blocks friendly damage unless `friendlyFire` flag is enabled.
+  - Range validation: Checks distance against `weapon.effectiveRangeM * 1.35`.
+  - Elimination & Scoring: Target health $\le 0$ increments killer kills, killer score (+150 headshot, +100 standard), team score, broadcasts killfeed notification, and schedules automated respawn.
+  - Automated Respawn: Repositions players at their team spawn base (`[50, 0.4, -50]`, `[-50, 0.4, 50]`, `[-50, 0.4, -50]`), resets health to 100, shield to 50, refills ammunition.
+  - `SHOOTING_RELOAD`: Authoritative reload delay timer with reserve ammo deduction and magazine replenishment.
+- Added: Client combat controls & raycasting in `apps/web/src/components/canvas/ShootingCharacterController.tsx`:
+  - Left-click (Mouse 0) firing: Camera forward raycasting, line-of-sight occlusion testing against Rapier world obstacles, 3D player hitbox detection (Head, Torso, Abdomen, Legs), procedural recoil pitch kick and spread.
+  - Right-click (Mouse 2) ADS (Aim Down Sights): Smooth camera zoom (6.2m -> 3.6m / 2.2m for Sniper) and dynamic mouse sensitivity scaling.
+  - `KeyR` reload action with procedural mechanical audio.
+  - `SHOOTING_PLAYER_RESPAWNED` listener: Smooth rigidBody repositioning on respawn without physics jitter.
+- Added: Zero-asset procedural Web Audio synthesizer (`apps/web/src/utils/combatAudio.ts`):
+  - Acoustic weapon gunshot profiles for Rifle, Shotgun, Sniper, SMG, and Pistol.
+  - Audio hitmarker chirps (1750Hz headshot, 1100Hz body) and kill-confirmed fanfare.
+- Enhanced: Tactical Combat HUD (`apps/web/src/components/game/ShootingCombatHUD.tsx`):
+  - Center crosshair with animated hitmarker 'X' (red for headshot, white for body hit).
+  - Top-right live killfeed stack with team colors, weapon icons, and headshot badges.
+  - Dual health & armor shield bars.
+  - Live ammo status with "RELOADING..." badge, low-ammo warnings, and reserve ammo tally.
+  - Desktop controls hint banner and red vignette "ELIMINATED" death screen overlay.
+- Added: Comprehensive test suites:
+  - Unit tests in `apps/game-server/tests/ShootingCombat.test.ts` (3 suites): verified firing rate limits, body-part damage, shield absorption, friendly fire prevention, elimination scoring, automated respawn, and score limit match victory.
+  - Edge Puppeteer browser test `scripts/shooting-combat-browser-test.mjs` (6 suites): verified game mode selection, 3D combat HUD overlay, firing and ammo consumption, [R] key reload cycle, multiplayer synchronization, and rematch reset. All 6 suites passed with screenshots in `test-screenshots/shooting-combat/`.
+- Verified:
+  - 60/60 unit/integration tests passing.
+  - 8/8 Turborepo typechecks passing with 0 errors.
+
+- Added: Dedicated 3D Urban Combat Map (`apps/web/src/components/canvas/ShootingMap.tsx`):
+  - $160\text{m} \times 160\text{m}$ urban battlefield enclosed by solid perimeter walls at $\pm 78$m.
+  - Team Red Base (`[50, 0, -50]`), Team Blue Base (`[-50, 0, 50]`), and Team Green Base (`[-50, 0, -50]`) with fortified spawn pads, team floodlights, flags, sandbags, and 3 exit lanes.
+  - Central Abandoned Warehouse ($32\text{m} \times 24\text{m} \times 7.5\text{m}$) with 4 wide hangar doorways, ground floor cover crates, and an elevated interior catwalk ($+3.5$m) accessible via dual industrial staircases.
+  - Shipping Container Flanking Maze with 11 containers and sloped metal ramps leading to upper container roof terraces ($+2.6$m).
+  - Two elevated sniper watchtowers ($+5.2$m) with sandbag parapets and switchback ramps.
+  - 18 concrete Jersey barriers, 3 armored tactical vehicles/trucks, and 6 industrial floodlight poles.
+  - Matching 1:1 Rapier WASM physics colliders for all floors, walls, ramps, stairs, catwalks, and cover obstacles.
+- Added: 3D character controller and avatars for shooting mode:
+  - `ShootingCharacterController.tsx`: Mouse look with pointer lock, camera-relative WASD steering, Spacebar jump ($v_y = 7.4\text{ m/s}$), and forward step-climbing assist.
+  - `ShootingCharacterAvatar.tsx`: Team color uniforms, helmets, visors, overhead team/health nameplates, and 3D weapon models held in hand (Rifle, Shotgun, Sniper, SMG, Pistol).
+  - `ShootingRemotePlayers.tsx`: Smooth 60 FPS interpolation for remote teammates and enemies across the arena.
+  - `ShootingGameScene.tsx`: React Three Fiber canvas with Rapier physics engine, shadows, and horizon fog.
+- Added: Tactical Combat HUD Overlay (`apps/web/src/components/game/ShootingCombatHUD.tsx`):
+  - Mode badge, live scores for Team Red, Team Blue, Team Green, countdown timer, and score limit.
+  - Center viewport aiming crosshair.
+  - Health bar (100 HP) and Shield bar (50 Shield).
+  - Active weapon card with category, emoji, and magazine ammo counter.
+  - Host "Return to Lobby" button for seamless rematches.
+- Integrated: Dynamic rendering in `apps/web/src/app/lobby/[roomCode]/page.tsx` rendering `ShootingGameScene` and `ShootingCombatHUD` when `shootingStatus === "ACTIVE"`.
+- Added: Automated browser test suite `scripts/shooting-map-browser-test.mjs` verifying 3D battlefield loading, HUD overlay, team spawn base placement, warehouse catwalk climb ($+3.5$m), jump over cover, and match reset across Microsoft Edge sessions. All 6 tests passed with 6 visual screenshots in `test-screenshots/shooting-map/`.
+- Verified: Complete monorepo regression coverage:
+  - 57/57 unit and integration tests passing (`@mafia/game-rules` 38, `@mafia/game-server` 19).
+  - 8/8 Turborepo typechecks passing with 0 errors.
+
+## 2026-11-04 (Multi-Game Platform Expansion - Milestone M2)
+
+- Added: Weapons catalog and hit detection configuration (`packages/shared/src/weapons.ts`):
+  - `WeaponId` enum (`ASSAULT_RIFLE`, `SHOTGUN`, `SNIPER_RIFLE`, `SMG`, `PISTOL`).
+  - `HitRegion` enum (`HEAD`, `UPPER_TORSO`, `ABDOMEN`, `ARMS`, `LEGS`) and multipliers table (`HEAD`: 2.0x, `UPPER_TORSO`: 1.0x, `ABDOMEN`: 0.85x, `ARMS`: 0.65x, `LEGS`: 0.60x).
+  - Declarative `WEAPONS_CATALOG` with full combat specifications for all 5 archetypes (damage, fire rate, reload duration, magazine capacity, max reserve ammo, effective range, recoil intensity, and spread).
+- Added: Server handlers and team mechanics in `apps/game-server/src/rooms/ShootingRoom.ts`:
+  - `SHOOTING_AUTO_BALANCE`: Host command to round-robin distribute all connected players evenly across Team Red, Team Blue, and Team Green.
+  - `SHOOTING_SELECT_LOADOUT`: Player primary weapon selection with authoritative ammunition initialization (`ammo`, `maxAmmo`).
+  - `SHOOTING_RENAME_TEAM`: Host command to rename teams with broadcast notifications.
+  - Initialized default `weaponId = WeaponId.ASSAULT_RIFLE` and magazine ammo on player join.
+- Added: Integration tests in `apps/game-server/tests/ShootingRoom.test.ts` verifying host auto-balancing, weapon loadout selection, and team renaming (all 4 tests passing).
+- Added: Shooting Lobby UI upgrades in `apps/web/src/components/game/ShootingLobby.tsx`:
+  - Host "Auto-Balance Teams" button in the top action bar.
+  - In-place team renaming input and Save action for room hosts on team card headers.
+  - Primary Weapon Loadout selector section with 5 weapon cards, category badges, emoji icons, stat bars, and "EQUIPPED" indicator.
+  - Player weapon preference badges displayed alongside player avatars in the team roster columns.
+- Added: Automated browser test suite `scripts/shooting-lobby-browser-test.mjs` verifying shooting lobby loading, weapon loadout visibility, sniper loadout selection, multiplayer loadout sync, auto-balance execution, and team renaming across 3 real connected browser sessions in Microsoft Edge. All 6 tests passed cleanly with 6 screenshots captured in `test-screenshots/shooting-lobby/`.
+- Verified: Full monorepo health:
+  - 57/57 automated unit and integration tests passing (`@mafia/game-rules` 38, `@mafia/game-server` 19).
+  - 8/8 Turborepo typechecks passing with 0 errors.
+
+## 2026-11-04 (Multi-Game Platform Expansion - Milestone M1)
+
+- Added: Multi-Game architecture schemas in `@mafia/shared`:
+  - `GameMode` enum (`UNSELECTED`, `MAFIA`, `SHOOTING`).
+  - Added authoritative schemas: `ShootingPlayerState.ts` (health 100, shield 50, teamId, score/kills/deaths, weapon/ammo, isReady, isHost), `ShootingTeamState.ts` (id, name, color, score, playerCount), `ShootingConfigState.ts` (duration, scoreLimit, selectedMap, respawnDelay, friendlyFire), and `ShootingRoomState.ts` (status `LOBBY`/`ACTIVE`/`MATCH_OVER`, teams, players, config).
+  - Added message types: `SELECT_GAME_MODE`, `SHOOTING_JOIN_TEAM`, `SHOOTING_ASSIGN_TEAM`, `SHOOTING_UPDATE_CONFIG`, `SHOOTING_START_MATCH`, `SHOOTING_PLAYER_ACTION`, `SHOOTING_HIT_EVENT`.
+- Added: Colyseus Shooting Room engine (`apps/game-server/src/rooms/ShootingRoom.ts`):
+  - Pre-populates 3 standard teams: Team Red (`#ef4444`), Team Blue (`#3b82f6`), Team Green (`#10b981`).
+  - Authoritative player joining, auto-balancing to smallest team, player-requested team joins, host manual player reassignment.
+  - Host-managed match configuration updates with input clamping and validation.
+  - Match lifecycle state machine (`LOBBY` $\rightarrow$ `ACTIVE` $\rightarrow$ `MATCH_OVER` $\rightarrow$ `LOBBY`).
+  - 60s reconnection token support with session recovery.
+- Added: Server room metadata dispatcher in `apps/game-server/src/index.ts`:
+  - Registered `shooting_room` with `filterBy(["roomCode"])`.
+  - Updated `/api/rooms/:roomCode` to query both `mafia_room` and `shooting_room` and return authoritative `gameMode` for immediate client routing.
+- Added: Server integration test suite `apps/game-server/tests/ShootingRoom.test.ts` verifying room creation, multi-team joining, auto-balancing, host player reassignment, config updates, ready toggling, match start, and match reset. All 3 tests pass.
+- Added: Post-Room-Creation Game Selection UI (`apps/web/src/components/game/GameSelectionScreen.tsx`):
+  - Dual-card selection for room creators featuring MAFIA 3D (3–20 players) and SHOOTING GAME (2–24 players).
+  - High-impact visual previews, feature tags, and non-host waiting screen.
+- Added: Shooting Game Lobby UI (`apps/web/src/components/game/ShootingLobby.tsx`):
+  - 3-column team roster display (Team Red, Team Blue, Team Green) with member avatars and scores.
+  - Direct team switching buttons and host player reassignment dropdowns.
+  - Match configuration controls: duration (3–15 min), score limit (15–75 kills), map selector, and respawn delay (2–5s).
+  - Ready toggle button, host START MATCH button, and live tactical chat.
+- Added: Dynamic game mode routing in `apps/web/src/app/lobby/[roomCode]/page.tsx`:
+  - Dynamically routes room states: `UNSELECTED` renders `GameSelectionScreen`, `MAFIA` renders Mafia Lobby or `GameHUD`, and `SHOOTING` renders `ShootingLobby` or Active Combat HUD.
+- Added: Automated browser test suite `scripts/multi-game-browser-test.mjs` running in Microsoft Edge Puppeteer across multiple connected clients. All 7 test suites passed cleanly:
+  1. Game Selection UI (Cards): PASS
+  2. Mafia Room Creation & Lobby: PASS
+  3. Mafia Game Start Integrity: PASS
+  4. Shooting Room Creation & Lobby: PASS
+  5. Team Assignment & Switching: PASS
+  6. Settings Isolation (Zero Leak): PASS
+  7. Match Lifecycle & Reset Lobby: PASS
+  - 7 screenshot artifacts captured in `test-screenshots/multi-game/`.
+- Verified: Complete regression verification across monorepo:
+  - 56/56 unit and integration tests passing (`@mafia/game-rules` 38, `@mafia/game-server` 18).
+  - 8/8 Turborepo typechecks passing with 0 errors.
+
+## 2026-11-04 (Multi-Game Platform Expansion - Milestone M0)
+
+- Fixed: Resolved elevated terrain and character collision issue (`CharacterController.tsx`). Diagnosed root cause as visual elevations (voting dais at $y = 0.35$m, sidewalk curbs at $y = 0.14$m) lacking physical Rapier colliders and character controller lacking step climbing. Added solid matching cylinder collider for the dais and solid cuboid colliders for all platforms and curbs in `TownMap.tsx`.
+- Added: Implemented forward step-climbing assistance in `CharacterController.tsx` using dual forward probe rays (`y + 0.08` foot probe and `y + 0.42` waist probe) to smoothly traverse curbs, steps, and podiums up to $0.35$m without getting caught on vertical faces or requiring manual jumping.
+- Added: Implemented high-fidelity downward ground raycasting (`y + 0.40` downwards) with ground clearance calculation. Firmly clamps grounded vertical velocity to $-0.6\text{ m/s}$ during walking/sprinting, and applies downward snap velocity ($-3.2\text{ m/s}$) when stepping down ledges or descending slopes to prevent mid-air floating.
+- Upgraded: Expanded `TownMap.tsx` from an $84\text{m} \times 84\text{m}$ park into a full $152\text{m} \times 152\text{m}$ urban environment ($>3\times$ area).
+  - Zone A Central Park: Paved tribunal circle, dais cylinder collider ($y = 0.35$m), 4 approach ramps, civic obelisk monument, 12 benches, 28 trees with solid cylinder trunk colliders, and 20 streetlamps.
+  - Multi-Tier Elevation Test Pavilion: $+0.60$m elevated stone terrace platform ($12\text{m} \times 8\text{m}$), smooth $8.5^\circ$ approach ramp with rotated cuboid collider, 3-step staircase ($0.20$m risers) with solid colliders, and lowered basin.
+  - Zone B City Streets & Raised Sidewalks: $10\text{m}$ wide asphalt avenues, road markings, dashed yellow dividers, and raised sidewalks ($+0.14\text{m}$) with solid cuboid colliders.
+  - Zone C Commercial District: 12 multi-story commercial buildings with awnings and rooftop props.
+  - Zone D Residential District: 12 residential brownstones and brick apartment complexes with courtyards and alleyways.
+  - Zone E Perimeter: Solid boundary walls at $\pm 76\text{m}$.
+- Fixed: Expanded server-side coordinate clamping in `MafiaRoom.ts` from $[-60, 60]$ to $[-85, 85]$ to support full exploration across the expanded $152\text{m} \times 152\text{m}$ map without desync.
+- Added: Created automated browser test suite `scripts/terrain-grounding-browser-test.mjs` verifying flat ground standing, dais climb, ramp ascent, terrace elevation, staircase descent snap, and curb climb across 3 real connected browser sessions in Microsoft Edge at 121 FPS, capturing 8 screenshot artifacts.
+- Verified: Re-ran `scripts/gta-camera-browser-test.mjs` confirming zero camera bobbing, stable sprint, explicit Spacebar jump, mouse look orbit, and multiplayer camera isolation all pass cleanly at 121 FPS.
+
+## 2026-11-04 (GTA Camera & Movement)
 
 - Added: Implemented GTA Vice City-style spherical orbit camera (`CharacterController.tsx`) with mouse-driven yaw and pitch control (clamped between $[-0.2, 1.2]$ radians) and mouse wheel distance zoom ($3.2$m to $13.0$m).
 - Added: Integrated HTML5 Pointer Lock API with automatic canvas capture on click and instant cursor release on `Escape`. Intelligently ignores clicks originating on HUD controls, buttons, input bars, and chat elements to preserve full UI interactivity.

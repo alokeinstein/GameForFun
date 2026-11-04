@@ -1,5 +1,5 @@
 import { Client, Room } from "colyseus.js";
-import { MafiaRoomState } from "@mafia/shared";
+import { MafiaRoomState, ShootingRoomState, GameMode } from "@mafia/shared";
 
 const SERVER_URL = process.env.NEXT_PUBLIC_GAME_SERVER_URL || "ws://localhost:2567";
 
@@ -59,4 +59,42 @@ export async function joinOrCreateMafiaRoom(
 
   return room;
 }
+
+export async function joinOrCreateShootingRoom(
+  roomCode: string,
+  displayName: string
+): Promise<Room<ShootingRoomState>> {
+  const code = roomCode.toUpperCase().trim();
+  const name = displayName.trim() || "Anonymous";
+
+  const room = await colyseusClient.joinOrCreate<ShootingRoomState>(
+    "shooting_room",
+    {
+      roomCode: code,
+      displayName: name
+    },
+    ShootingRoomState
+  );
+
+  return room;
+}
+
+export async function queryRoomInfo(roomCode: string): Promise<{
+  roomId: string;
+  roomCode: string;
+  gameMode: string;
+  clients: number;
+  maxClients: number;
+} | null> {
+  try {
+    const res = await fetch(`${HTTP_SERVER_URL}/api/rooms/${encodeURIComponent(roomCode.toUpperCase().trim())}`);
+    if (res.ok) {
+      return await res.json();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 

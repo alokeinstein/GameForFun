@@ -1,5 +1,11 @@
 import { GameConfig } from "@mafia/game-rules";
 
+export enum GameMode {
+  UNSELECTED = "UNSELECTED",
+  MAFIA = "MAFIA",
+  SHOOTING = "SHOOTING"
+}
+
 export const DEFAULT_GAME_CONFIG: GameConfig = {
   mafiaPercentage: 20,
   nightDurationSec: 30,

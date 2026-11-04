@@ -5,6 +5,7 @@ import colyseus from "colyseus";
 const { Server, matchMaker } = colyseus;
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { MafiaRoom } from "./rooms/MafiaRoom.js";
+import { ShootingRoom } from "./rooms/ShootingRoom.js";
 import {
   getRecentMatchHistory,
   getPlayerStatistics,
@@ -31,14 +32,17 @@ app.get("/health", (req, res) => {
 app.get("/api/rooms/:roomCode", async (req, res) => {
   const roomCode = (req.params.roomCode || "").toUpperCase();
   try {
-    const rooms = await matchMaker.query({ name: "mafia_room" });
-    const match = rooms.find(r => r.metadata?.roomCode === roomCode);
+    const mafiaRooms = await matchMaker.query({ name: "mafia_room" });
+    const shootingRooms = await matchMaker.query({ name: "shooting_room" });
+    const allRooms = [...mafiaRooms, ...shootingRooms];
+    const match = allRooms.find(r => r.metadata?.roomCode === roomCode);
     if (!match) {
       return res.status(404).json({ error: "Room not found" });
     }
     return res.json({
       roomId: match.roomId,
       roomCode: match.metadata.roomCode,
+      gameMode: match.metadata.gameMode || (match.name === "shooting_room" ? "SHOOTING" : "MAFIA"),
       clients: match.clients,
       maxClients: match.maxClients
     });
@@ -79,8 +83,9 @@ const gameServer = new Server({
   })
 });
 
-// Register the Mafia room with roomCode filter for instant matchmaking by room code
+// Register rooms with roomCode filter for instant matchmaking by room code
 gameServer.define("mafia_room", MafiaRoom).filterBy(["roomCode"]);
+gameServer.define("shooting_room", ShootingRoom).filterBy(["roomCode"]);
 
 httpServer.listen(PORT, () => {
   console.log(`[GameServer] MAFIA Colyseus Server running on http://localhost:${PORT}`);

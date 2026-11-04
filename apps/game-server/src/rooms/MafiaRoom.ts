@@ -260,15 +260,15 @@ export class MafiaRoom extends Room<MafiaRoomState> {
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
 
-      // Sanitize and update player transform with boundary clamping
+      // Sanitize and update player transform with boundary clamping (expanded 160m map: [-85, 85])
       if (typeof data.x === "number" && !isNaN(data.x)) {
-        player.x = Math.max(-60, Math.min(60, data.x));
+        player.x = Math.max(-85, Math.min(85, data.x));
       }
       if (typeof data.y === "number" && !isNaN(data.y)) {
         player.y = Math.max(-5, Math.min(30, data.y));
       }
       if (typeof data.z === "number" && !isNaN(data.z)) {
-        player.z = Math.max(-60, Math.min(60, data.z));
+        player.z = Math.max(-85, Math.min(85, data.z));
       }
       if (typeof data.rotationY === "number" && !isNaN(data.rotationY)) {
         player.rotationY = data.rotationY;

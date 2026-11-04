@@ -88,11 +88,11 @@ export default function HomePage() {
       <header className="border-b border-noir-800 bg-noir-900/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blood-600 to-blood-500 flex items-center justify-center font-bold text-white shadow-lg shadow-blood-600/30">
-              M
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blood-600 via-amber-500 to-emerald-500 flex items-center justify-center font-bold text-white shadow-lg shadow-blood-600/30">
+              G
             </div>
             <span className="font-extrabold text-lg tracking-wider text-white">
-              MAFIA <span className="text-blood-500 text-xs font-mono px-1.5 py-0.5 rounded bg-blood-600/10 border border-blood-500/20">3D</span>
+              GAME<span className="text-blood-500">ARENA</span> <span className="text-emerald-400 text-xs font-mono px-1.5 py-0.5 rounded bg-emerald-600/10 border border-emerald-500/20">3D PLATFORM</span>
             </span>
           </div>
           <div className="flex items-center space-x-4 text-xs font-mono text-noir-400">
@@ -114,13 +114,13 @@ export default function HomePage() {
         <div className="text-center space-y-4">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-noir-850 border border-noir-700 text-noir-200 text-xs font-mono">
             <Sparkles className="w-3.5 h-3.5 text-blood-500" />
-            <span>Server-Authoritative Real-Time 3D Social Deduction</span>
+            <span>Multiplayer 3D Gaming Platform • Mafia 3D & Team Shooting</span>
           </div>
           <h1 className="text-5xl sm:text-7xl font-black tracking-tight text-white uppercase">
-            Trust <span className="text-blood-500 drop-shadow-[0_0_25px_rgba(239,68,68,0.4)]">No One.</span>
+            PLAY <span className="text-transparent bg-clip-text bg-gradient-to-r from-blood-500 via-amber-400 to-emerald-400">TOGETHER.</span>
           </h1>
           <p className="max-w-xl mx-auto text-noir-400 text-base sm:text-lg">
-            A small town in the grip of deception. Uncover the secret Mafia before they eliminate every Citizen, or deceive your way to victory.
+            Create a room, pick your game, invite your friends, and compete in server-authoritative 3D social deduction or high-speed team combat.
           </p>
         </div>
 

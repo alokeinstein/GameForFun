@@ -13,77 +13,97 @@ export function TownMap({ phase }: TownMapProps) {
   const isNight = phase === Phase.NIGHT;
   const isDawn = phase === Phase.MORNING_ANNOUNCEMENT;
 
-  // 16 Multi-Story City Buildings Framing the Park Perimeter
+  // 24 Multi-Story Buildings Framing the Expanded City Map (152m x 152m World)
   const buildings = useMemo(() => {
     return [
-      // North row (z ≈ -38)
-      { pos: [-27, 10, -38], size: [14, 20, 12], color: "#1e293b", roofProps: "waterTower", awning: "#2563eb", floors: 6 },
-      { pos: [-10, 12, -39], size: [16, 24, 12], color: "#7c2d12", roofProps: "hvac", awning: "#dc2626", floors: 7 },
-      { pos: [8, 9, -38], size: [15, 18, 12], color: "#334155", roofProps: "antenna", awning: "#059669", floors: 5 },
-      { pos: [26, 13, -39], size: [16, 26, 12], color: "#1e1b4b", roofProps: "penthouse", awning: "#d97706", floors: 8 },
+      // ----------------------------------------------------
+      // North Commercial Boulevard (z ≈ -60)
+      // ----------------------------------------------------
+      { pos: [-48, 12, -60], size: [16, 24, 14], color: "#1e293b", roofProps: "waterTower", awning: "#2563eb", name: "Metro Tower", floors: 7 },
+      { pos: [-30, 15, -61], size: [18, 30, 14], color: "#0f172a", roofProps: "antenna", awning: "#059669", name: "Financial Plaza", floors: 9 },
+      { pos: [-10, 11, -60], size: [16, 22, 14], color: "#7c2d12", roofProps: "hvac", awning: "#dc2626", name: "Grand Hotel", floors: 6 },
+      { pos: [10, 16, -61], size: [18, 32, 14], color: "#1e1b4b", roofProps: "penthouse", awning: "#d97706", name: "Imperial Offices", floors: 10 },
+      { pos: [30, 10, -60], size: [16, 20, 14], color: "#334155", roofProps: "waterTower", awning: "#2563eb", name: "Arcade Mall", floors: 5 },
+      { pos: [48, 14, -61], size: [16, 28, 14], color: "#1e293b", roofProps: "antenna", awning: "#dc2626", name: "City Bank", floors: 8 },
 
-      // South row (z ≈ +38)
-      { pos: [-26, 11, 38], size: [15, 22, 12], color: "#334155", roofProps: "penthouse", awning: "#d97706", floors: 7 },
-      { pos: [-8, 8.5, 39], size: [16, 17, 12], color: "#1e293b", roofProps: "antenna", awning: "#2563eb", floors: 5 },
-      { pos: [9, 13, 38], size: [14, 26, 12], color: "#7c2d12", roofProps: "waterTower", awning: "#dc2626", floors: 8 },
-      { pos: [27, 9.5, 39], size: [16, 19, 12], color: "#1e1b4b", roofProps: "hvac", awning: "#059669", floors: 6 },
+      // ----------------------------------------------------
+      // South Residential Brownstones & Apartments (z ≈ +60)
+      // ----------------------------------------------------
+      { pos: [-48, 9.5, 60], size: [16, 19, 14], color: "#78350f", roofProps: "hvac", awning: "#059669", name: "Oakhaven Flats", floors: 5 },
+      { pos: [-30, 11, 61], size: [17, 22, 14], color: "#334155", roofProps: "waterTower", awning: "#d97706", name: "Parkview Condos", floors: 6 },
+      { pos: [-10, 13, 60], size: [16, 26, 14], color: "#1e293b", roofProps: "penthouse", awning: "#2563eb", name: "Harbor Brownstones", floors: 7 },
+      { pos: [10, 9, 61], size: [18, 18, 14], color: "#7c2d12", roofProps: "antenna", awning: "#dc2626", name: "Chestnut Manor", floors: 5 },
+      { pos: [30, 12, 60], size: [16, 24, 14], color: "#1e1b4b", roofProps: "hvac", awning: "#059669", name: "Lexington Hall", floors: 7 },
+      { pos: [48, 10, 61], size: [16, 20, 14], color: "#334155", roofProps: "waterTower", awning: "#d97706", name: "Riverside Residences", floors: 6 },
 
-      // West row (x ≈ -38)
-      { pos: [-38, 11, -20], size: [12, 22, 15], color: "#1e1b4b", roofProps: "waterTower", awning: "#059669", floors: 7 },
-      { pos: [-39, 9, -4], size: [12, 18, 14], color: "#334155", roofProps: "hvac", awning: "#2563eb", floors: 5 },
-      { pos: [-38, 13, 12], size: [12, 26, 14], color: "#7c2d12", roofProps: "antenna", awning: "#dc2626", floors: 8 },
-      { pos: [-39, 8, 27], size: [12, 16, 14], color: "#1e293b", roofProps: "penthouse", awning: "#d97706", floors: 5 },
+      // ----------------------------------------------------
+      // West District (x ≈ -60)
+      // ----------------------------------------------------
+      { pos: [-60, 13, -36], size: [14, 26, 18], color: "#1e1b4b", roofProps: "waterTower", awning: "#059669", name: "Bayside Court", floors: 8 },
+      { pos: [-61, 10, -18], size: [14, 20, 16], color: "#334155", roofProps: "hvac", awning: "#2563eb", name: "Trinity Suites", floors: 6 },
+      { pos: [-60, 14, 0], size: [14, 28, 18], color: "#7c2d12", roofProps: "antenna", awning: "#dc2626", name: "Metropolitan Lofts", floors: 8 },
+      { pos: [-61, 9.5, 18], size: [14, 19, 16], color: "#1e293b", roofProps: "penthouse", awning: "#d97706", name: "Westgate Apartments", floors: 5 },
+      { pos: [-60, 12, 36], size: [14, 24, 18], color: "#78350f", roofProps: "waterTower", awning: "#059669", name: "Sunset Terrace", floors: 7 },
 
-      // East row (x ≈ +38)
-      { pos: [38, 9, -20], size: [12, 18, 14], color: "#7c2d12", roofProps: "penthouse", awning: "#2563eb", floors: 5 },
-      { pos: [39, 13, -4], size: [12, 26, 14], color: "#1e293b", roofProps: "waterTower", awning: "#d97706", floors: 8 },
-      { pos: [38, 8.5, 12], size: [12, 17, 14], color: "#1e1b4b", roofProps: "hvac", awning: "#059669", floors: 5 },
-      { pos: [39, 12, 27], size: [12, 24, 15], color: "#334155", roofProps: "antenna", awning: "#dc2626", floors: 7 }
+      // ----------------------------------------------------
+      // East Commercial & Financial District (x ≈ +60)
+      // ----------------------------------------------------
+      { pos: [60, 11, -36], size: [14, 22, 18], color: "#334155", roofProps: "penthouse", awning: "#2563eb", name: "Eastside Commerce", floors: 6 },
+      { pos: [61, 15, -18], size: [14, 30, 16], color: "#1e293b", roofProps: "waterTower", awning: "#d97706", name: "Starlight Center", floors: 9 },
+      { pos: [60, 13, 0], size: [14, 26, 18], color: "#1e1b4b", roofProps: "hvac", awning: "#059669", name: "Midtown Complex", floors: 8 },
+      { pos: [61, 10, 18], size: [14, 20, 16], color: "#7c2d12", roofProps: "antenna", awning: "#dc2626", name: "Broadway Studios", floors: 6 },
+      { pos: [60, 14, 36], size: [14, 28, 18], color: "#0f172a", roofProps: "waterTower", awning: "#2563eb", name: "Crown Tower", floors: 8 }
     ];
   }, []);
 
-  // 22 Varied Trees Distributed Across Park Lawn Quadrants
+  // 32 Varied Trees Distributed Across Park Quadrants and Street Boulevards
   const trees = useMemo(() => {
     return [
-      // North-West Quadrant
+      // Central Park NW
       { pos: [-18, 0, -18], type: "oak", scale: 1.15 },
-      { pos: [-26, 0, -14], type: "pine", scale: 1.2 },
-      { pos: [-12, 0, -26], type: "birch", scale: 1.0 },
-      { pos: [-24, 0, -25], type: "oak", scale: 0.95 },
+      { pos: [-28, 0, -14], type: "pine", scale: 1.2 },
+      { pos: [-14, 0, -28], type: "birch", scale: 1.0 },
+      { pos: [-26, 0, -26], type: "oak", scale: 0.95 },
       { pos: [-8, 0, -16], type: "pine", scale: 1.05 },
 
-      // North-East Quadrant
-      { pos: [18, 0, -18], type: "pine", scale: 1.2 },
-      { pos: [26, 0, -14], type: "oak", scale: 1.1 },
-      { pos: [14, 0, -25], type: "birch", scale: 1.0 },
-      { pos: [24, 0, -26], type: "oak", scale: 1.05 },
-      { pos: [8, 0, -16], type: "pine", scale: 0.9 },
+      // Central Park NE (near elevation test pavilion)
+      { pos: [14, 0, -16], type: "pine", scale: 1.1 },
+      { pos: [32, 0, -14], type: "oak", scale: 1.1 },
+      { pos: [14, 0, -32], type: "birch", scale: 1.0 },
+      { pos: [34, 0, -32], type: "oak", scale: 1.05 },
+      { pos: [8, 0, -20], type: "pine", scale: 0.95 },
 
-      // South-West Quadrant
+      // Central Park SW
       { pos: [-18, 0, 18], type: "oak", scale: 1.1 },
-      { pos: [-26, 0, 14], type: "birch", scale: 1.0 },
-      { pos: [-13, 0, 26], type: "pine", scale: 1.25 },
-      { pos: [-25, 0, 25], type: "oak", scale: 1.0 },
+      { pos: [-28, 0, 14], type: "birch", scale: 1.0 },
+      { pos: [-14, 0, 28], type: "pine", scale: 1.25 },
+      { pos: [-26, 0, 26], type: "oak", scale: 1.0 },
       { pos: [-8, 0, 16], type: "birch", scale: 0.95 },
 
-      // South-East Quadrant
+      // Central Park SE
       { pos: [18, 0, 18], type: "birch", scale: 1.05 },
-      { pos: [26, 0, 14], type: "pine", scale: 1.15 },
-      { pos: [14, 0, 26], type: "oak", scale: 1.2 },
-      { pos: [25, 0, 25], type: "pine", scale: 1.0 },
+      { pos: [28, 0, 14], type: "pine", scale: 1.15 },
+      { pos: [14, 0, 28], type: "oak", scale: 1.2 },
+      { pos: [26, 0, 26], type: "pine", scale: 1.0 },
       { pos: [8, 0, 16], type: "oak", scale: 0.9 },
 
-      // Outer Perimeter accents
-      { pos: [-32, 0, -2], type: "pine", scale: 1.1 },
-      { pos: [32, 0, 2], type: "oak", scale: 1.1 }
+      // Street Boulevard Sidewalk Trees
+      { pos: [-42, 0, -12], type: "birch", scale: 1.0 },
+      { pos: [-42, 0, 12], type: "birch", scale: 1.0 },
+      { pos: [42, 0, -12], type: "birch", scale: 1.0 },
+      { pos: [42, 0, 12], type: "birch", scale: 1.0 },
+      { pos: [-12, 0, -42], type: "oak", scale: 1.0 },
+      { pos: [12, 0, -42], type: "oak", scale: 1.0 },
+      { pos: [-12, 0, 42], type: "oak", scale: 1.0 },
+      { pos: [12, 0, 42], type: "oak", scale: 1.0 }
     ];
   }, []);
 
-  // 8 Wooden Park Benches in Central Tribunal Circle
+  // 12 Wooden Park Benches in Central Tribunal Circle & Plaza
   const benches = useMemo(() => {
     const list = [];
     const count = 8;
-    const radius = 8.5;
+    const radius = 8.8;
     for (let i = 0; i < count; i++) {
       const angle = (i / count) * Math.PI * 2;
       const x = Math.cos(angle) * radius;
@@ -93,10 +113,15 @@ export function TownMap({ phase }: TownMapProps) {
         rot: [0, -angle + Math.PI / 2, 0] as [number, number, number]
       });
     }
+    // Additional park benches
+    list.push({ pos: [-20, 0, 0] as [number, number, number], rot: [0, Math.PI / 2, 0] as [number, number, number] });
+    list.push({ pos: [20, 0, 0] as [number, number, number], rot: [0, -Math.PI / 2, 0] as [number, number, number] });
+    list.push({ pos: [0, 0, -20] as [number, number, number], rot: [0, Math.PI, 0] as [number, number, number] });
+    list.push({ pos: [0, 0, 20] as [number, number, number], rot: [0, 0, 0] as [number, number, number] });
     return list;
   }, []);
 
-  // 12 Ornamental Streetlamps along paths and plaza
+  // 20 Ornamental Streetlamps along walkways, plaza, and city streets
   const streetlamps = useMemo(() => {
     return [
       // Central plaza periphery
@@ -104,19 +129,28 @@ export function TownMap({ phase }: TownMapProps) {
       [12, 0, -12],
       [-12, 0, 12],
       [12, 0, 12],
-      // Main walkways
-      [-22, 0, -3.2],
-      [22, 0, -3.2],
-      [-3.2, 0, -22],
-      [-3.2, 0, 22],
-      [-22, 0, 3.2],
-      [22, 0, 3.2],
-      [3.2, 0, -22],
-      [3.2, 0, 22]
+      // Main park pathways
+      [-24, 0, -3.2],
+      [24, 0, -3.2],
+      [-3.2, 0, -24],
+      [-3.2, 0, 24],
+      [-24, 0, 3.2],
+      [24, 0, 3.2],
+      [3.2, 0, -24],
+      [3.2, 0, 24],
+      // Outer Street intersections & sidewalks
+      [-42, 0, -42],
+      [42, 0, -42],
+      [-42, 0, 42],
+      [42, 0, 42],
+      [-42, 0, 0],
+      [42, 0, 0],
+      [0, 0, -42],
+      [0, 0, 42]
     ];
   }, []);
 
-  // Flowerbeds & Decorative Shrub Clusters
+  // Flowerbeds & Shrub Clusters
   const flowerBeds = useMemo(() => {
     return [
       { pos: [-6, 0, -6], color: "#ef4444" },
@@ -140,11 +174,11 @@ export function TownMap({ phase }: TownMapProps) {
       {isNight ? (
         <>
           <color attach="background" args={["#0c1322"]} />
-          <fog attach="fog" args={["#0c1322", 40, 105]} />
+          <fog attach="fog" args={["#0c1322", 50, 140]} />
           <ambientLight intensity={0.42} color="#60a5fa" />
           <hemisphereLight args={["#334155", "#0f172a", 0.6]} />
           <directionalLight
-            position={[-20, 35, -20]}
+            position={[-30, 45, -30]}
             intensity={0.9}
             color="#93c5fd"
             castShadow
@@ -154,11 +188,11 @@ export function TownMap({ phase }: TownMapProps) {
       ) : isDawn ? (
         <>
           <color attach="background" args={["#2d1722"]} />
-          <fog attach="fog" args={["#2d1722", 45, 110]} />
+          <fog attach="fog" args={["#2d1722", 55, 145]} />
           <ambientLight intensity={0.55} color="#fed7aa" />
           <hemisphereLight args={["#fdba74", "#2e7d32", 0.7]} />
           <directionalLight
-            position={[30, 25, -15]}
+            position={[40, 35, -25]}
             intensity={1.5}
             color="#fb923c"
             castShadow
@@ -168,11 +202,11 @@ export function TownMap({ phase }: TownMapProps) {
       ) : (
         <>
           <color attach="background" args={["#60a5fa"]} />
-          <fog attach="fog" args={["#93c5fd", 65, 125]} />
-          <ambientLight intensity={0.75} color="#ffffff" />
+          <fog attach="fog" args={["#93c5fd", 75, 160]} />
+          <ambientLight intensity={0.78} color="#ffffff" />
           <hemisphereLight args={["#93c5fd", "#2e7d32", 0.85]} />
           <directionalLight
-            position={[25, 45, 20]}
+            position={[35, 55, 30]}
             intensity={1.5}
             color="#fffbeb"
             castShadow
@@ -181,50 +215,36 @@ export function TownMap({ phase }: TownMapProps) {
         </>
       )}
 
-      {/* 2. GROUND & WALKING PATHWAYS */}
+      {/* 2. BASE GROUND & URBAN FOUNDATION */}
       <RigidBody type="fixed" colliders={false}>
-        {/* Main Solid Ground Physics Collider */}
-        <CuboidCollider args={[45, 0.5, 45]} position={[0, -0.5, 0]} />
+        {/* Full Expanded Terrain Solid Ground Physics Collider (160m x 160m) */}
+        <CuboidCollider args={[85, 0.5, 85]} position={[0, -0.5, 0]} />
 
-        {/* Vibrant Green Park Grass Lawn */}
+        {/* Outer City Ground Bed */}
+        <mesh receiveShadow position={[0, -0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[156, 156]} />
+          <meshStandardMaterial color="#1e293b" roughness={0.9} />
+        </mesh>
+
+        {/* Central Park Grass Lawn (74m x 74m) */}
         <mesh receiveShadow position={[0, -0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[84, 84]} />
+          <planeGeometry args={[74, 74]} />
           <meshStandardMaterial color="#2e7d32" roughness={0.85} metalness={0.05} />
         </mesh>
 
         {/* Stone Walking Cross Paths (North-South & East-West) */}
-        {/* North-South Pathway */}
         <mesh receiveShadow position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[4.6, 82]} />
+          <planeGeometry args={[4.8, 73]} />
           <meshStandardMaterial color="#64748b" roughness={0.7} />
         </mesh>
-        {/* East-West Pathway */}
         <mesh receiveShadow position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[82, 4.6]} />
+          <planeGeometry args={[73, 4.8]} />
           <meshStandardMaterial color="#64748b" roughness={0.7} />
-        </mesh>
-
-        {/* Stone Pathway Curbs / Edges */}
-        <mesh position={[-2.4, 0.04, 0]} receiveShadow>
-          <boxGeometry args={[0.2, 0.08, 82]} />
-          <meshStandardMaterial color="#334155" roughness={0.8} />
-        </mesh>
-        <mesh position={[2.4, 0.04, 0]} receiveShadow>
-          <boxGeometry args={[0.2, 0.08, 82]} />
-          <meshStandardMaterial color="#334155" roughness={0.8} />
-        </mesh>
-        <mesh position={[0, 0.04, -2.4]} receiveShadow>
-          <boxGeometry args={[82, 0.08, 0.2]} />
-          <meshStandardMaterial color="#334155" roughness={0.8} />
-        </mesh>
-        <mesh position={[0, 0.04, 2.4]} receiveShadow>
-          <boxGeometry args={[82, 0.08, 0.2]} />
-          <meshStandardMaterial color="#334155" roughness={0.8} />
         </mesh>
 
         {/* Outer Circular Plaza Paver Ring */}
         <mesh receiveShadow position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[10.5, 12.2, 48]} />
+          <ringGeometry args={[10.5, 12.6, 48]} />
           <meshStandardMaterial color="#475569" roughness={0.75} />
         </mesh>
 
@@ -233,15 +253,114 @@ export function TownMap({ phase }: TownMapProps) {
           <circleGeometry args={[10.5, 48]} />
           <meshStandardMaterial color="#94a3b8" roughness={0.65} />
         </mesh>
+      </RigidBody>
 
-        {/* Inner Dais / Raised Podium for Voting Tribunal */}
+      {/* 3. CENTRAL VOTING DAIS (RAISED PODIUM WITH SOLID CYLINDER COLLIDER & APPROACH RAMPS) */}
+      {/* Visual top is at y = 0.35m. Solid collider matches perfectly so feet stand cleanly on top! */}
+      <RigidBody type="fixed" colliders={false} position={[0, 0, 0]}>
+        {/* Exact Cylinder Collider matching the dais height (0.35m) */}
+        <CylinderCollider args={[0.175, 4.8]} position={[0, 0.175, 0]} />
+
+        {/* Raised Dais Cylinder Mesh */}
         <mesh receiveShadow castShadow position={[0, 0.175, 0]}>
-          <cylinderGeometry args={[4.4, 4.8, 0.35, 32]} />
+          <cylinderGeometry args={[4.5, 4.8, 0.35, 32]} />
           <meshStandardMaterial color="#334155" roughness={0.6} />
+        </mesh>
+
+        {/* 4 Cardinal Approach Ramps (North, South, East, West) from y=0 to dais top at y=0.35 */}
+        {/* North Dais Ramp */}
+        <mesh receiveShadow castShadow position={[0, 0.175, -5.2]} rotation={[0.24, 0, 0]}>
+          <boxGeometry args={[2.4, 0.12, 1.4]} />
+          <meshStandardMaterial color="#475569" roughness={0.7} />
+        </mesh>
+        {/* South Dais Ramp */}
+        <mesh receiveShadow castShadow position={[0, 0.175, 5.2]} rotation={[-0.24, 0, 0]}>
+          <boxGeometry args={[2.4, 0.12, 1.4]} />
+          <meshStandardMaterial color="#475569" roughness={0.7} />
+        </mesh>
+        {/* East Dais Ramp */}
+        <mesh receiveShadow castShadow position={[5.2, 0.175, 0]} rotation={[0, 0, -0.24]}>
+          <boxGeometry args={[1.4, 0.12, 2.4]} />
+          <meshStandardMaterial color="#475569" roughness={0.7} />
+        </mesh>
+        {/* West Dais Ramp */}
+        <mesh receiveShadow castShadow position={[-5.2, 0.175, 0]} rotation={[0, 0, 0.24]}>
+          <boxGeometry args={[1.4, 0.12, 2.4]} />
+          <meshStandardMaterial color="#475569" roughness={0.7} />
         </mesh>
       </RigidBody>
 
-      {/* 3. CENTRAL CIVIC MONUMENT / FOUNTAIN (With Solid Collider) */}
+      {/* 4. DEDICATED MULTI-TIER ELEVATION TEST PAVILION (PART 1.5 VALIDATION TEST GROUND) */}
+      {/* Features: Flat ground, 0.6m Elevated Terrace Platform, Smooth 8.5° Ramp, and 3-Step Staircase */}
+      <group position={[25, 0, -25]}>
+        {/* Main Elevated Terrace Platform (12m x 8m at y = 0.60m) */}
+        <RigidBody type="fixed" colliders="cuboid" position={[0, 0.30, 0]}>
+          <mesh castShadow receiveShadow>
+            <boxGeometry args={[12, 0.60, 8]} />
+            <meshStandardMaterial color="#cbd5e1" roughness={0.6} />
+          </mesh>
+        </RigidBody>
+
+        {/* Platform Decorative Perimeter Balustrade / Low Curb */}
+        <RigidBody type="fixed" colliders="cuboid" position={[0, 0.72, -3.85]}>
+          <mesh castShadow receiveShadow>
+            <boxGeometry args={[12, 0.24, 0.3]} />
+            <meshStandardMaterial color="#475569" roughness={0.5} />
+          </mesh>
+        </RigidBody>
+        <RigidBody type="fixed" colliders="cuboid" position={[0, 0.72, 3.85]}>
+          <mesh castShadow receiveShadow>
+            <boxGeometry args={[12, 0.24, 0.3]} />
+            <meshStandardMaterial color="#475569" roughness={0.5} />
+          </mesh>
+        </RigidBody>
+        <RigidBody type="fixed" colliders="cuboid" position={[5.85, 0.72, 0]}>
+          <mesh castShadow receiveShadow>
+            <boxGeometry args={[0.3, 0.24, 8]} />
+            <meshStandardMaterial color="#475569" roughness={0.5} />
+          </mesh>
+        </RigidBody>
+
+        {/* Smooth Walkway Ramp (West Side: from x=-6 to x=-10, rising from y=0 to y=0.60m) */}
+        {/* Ramp run = 4.0m, rise = 0.60m, slope = 8.53 deg (0.1489 rad), incline length = 4.045m */}
+        <RigidBody
+          type="fixed"
+          colliders="cuboid"
+          position={[-8.0, 0.30, 0]}
+          rotation={[0, 0, -0.1489]}
+        >
+          <mesh castShadow receiveShadow>
+            <boxGeometry args={[4.045, 0.20, 3.2]} />
+            <meshStandardMaterial color="#94a3b8" roughness={0.7} />
+          </mesh>
+        </RigidBody>
+
+        {/* 3-Step Staircase (South Side: 3 stairs leading down to lawn) */}
+        {/* Step 1: y = 0.20m */}
+        <RigidBody type="fixed" colliders="cuboid" position={[0, 0.10, 5.2]}>
+          <mesh castShadow receiveShadow>
+            <boxGeometry args={[3.6, 0.20, 0.8]} />
+            <meshStandardMaterial color="#64748b" roughness={0.7} />
+          </mesh>
+        </RigidBody>
+        {/* Step 2: y = 0.40m */}
+        <RigidBody type="fixed" colliders="cuboid" position={[0, 0.20, 4.4]}>
+          <mesh castShadow receiveShadow>
+            <boxGeometry args={[3.6, 0.40, 0.8]} />
+            <meshStandardMaterial color="#64748b" roughness={0.7} />
+          </mesh>
+        </RigidBody>
+
+        {/* Terrace Overlook Benches */}
+        <RigidBody type="fixed" colliders="cuboid" position={[2.5, 0.85, -2.5]}>
+          <mesh castShadow receiveShadow>
+            <boxGeometry args={[2.2, 0.12, 0.7]} />
+            <meshStandardMaterial color="#854d0e" roughness={0.75} />
+          </mesh>
+        </RigidBody>
+      </group>
+
+      {/* 5. CENTRAL CIVIC MONUMENT / OBELISK */}
       <RigidBody type="fixed" colliders="cuboid" position={[0, 0.35, 0]}>
         {/* Monument Base */}
         <mesh castShadow receiveShadow position={[0, 0.3, 0]}>
@@ -269,12 +388,12 @@ export function TownMap({ phase }: TownMapProps) {
           position={[0, 4.2, 0]}
           color={isNight ? "#dc2626" : "#f59e0b"}
           intensity={isNight ? 2.5 : 1.5}
-          distance={12}
+          distance={14}
           decay={2}
         />
       </RigidBody>
 
-      {/* 4. PARK BENCHES (With Solid Cuboid Colliders) */}
+      {/* 6. PARK BENCHES */}
       {benches.map((b, idx) => (
         <RigidBody
           key={idx}
@@ -305,7 +424,7 @@ export function TownMap({ phase }: TownMapProps) {
         </RigidBody>
       ))}
 
-      {/* 5. TREES (With Solid Cylinder Colliders on Trunks) */}
+      {/* 7. TREES (With Solid Trunk Cylinder Colliders) */}
       {trees.map((t, idx) => (
         <RigidBody
           key={idx}
@@ -313,17 +432,14 @@ export function TownMap({ phase }: TownMapProps) {
           colliders={false}
           position={t.pos as [number, number, number]}
         >
-          {/* Solid Trunk Collider prevents player from walking through trees */}
           <CylinderCollider args={[1.5, 0.32]} position={[0, 1.5, 0]} />
 
           {t.type === "oak" && (
             <group scale={t.scale}>
-              {/* Oak Trunk */}
               <mesh castShadow receiveShadow position={[0, 1.6, 0]}>
                 <cylinderGeometry args={[0.28, 0.42, 3.2, 8]} />
                 <meshStandardMaterial color="#4a2e18" roughness={0.9} />
               </mesh>
-              {/* Layered Foliage Spheres */}
               <mesh castShadow receiveShadow position={[0, 3.8, 0]}>
                 <dodecahedronGeometry args={[1.8, 1]} />
                 <meshStandardMaterial color="#16a34a" roughness={0.8} />
@@ -341,12 +457,10 @@ export function TownMap({ phase }: TownMapProps) {
 
           {t.type === "pine" && (
             <group scale={t.scale}>
-              {/* Pine Trunk */}
               <mesh castShadow receiveShadow position={[0, 1.8, 0]}>
                 <cylinderGeometry args={[0.2, 0.35, 3.6, 7]} />
                 <meshStandardMaterial color="#382313" roughness={0.9} />
               </mesh>
-              {/* Stacked Cones */}
               <mesh castShadow receiveShadow position={[0, 3.0, 0]}>
                 <coneGeometry args={[1.9, 2.0, 7]} />
                 <meshStandardMaterial color="#14532d" roughness={0.85} />
@@ -364,17 +478,14 @@ export function TownMap({ phase }: TownMapProps) {
 
           {t.type === "birch" && (
             <group scale={t.scale}>
-              {/* Birch White Trunk */}
               <mesh castShadow receiveShadow position={[0, 1.6, 0]}>
                 <cylinderGeometry args={[0.2, 0.28, 3.2, 8]} />
                 <meshStandardMaterial color="#e2e8f0" roughness={0.6} />
               </mesh>
-              {/* Birch Bark Details */}
               <mesh position={[0, 1.8, 0]}>
                 <cylinderGeometry args={[0.21, 0.21, 0.3, 8]} />
                 <meshStandardMaterial color="#1e293b" roughness={0.9} />
               </mesh>
-              {/* Birch Foliage */}
               <mesh castShadow receiveShadow position={[0, 3.6, 0]}>
                 <icosahedronGeometry args={[1.6, 1]} />
                 <meshStandardMaterial color="#4ade80" roughness={0.8} />
@@ -388,15 +499,13 @@ export function TownMap({ phase }: TownMapProps) {
         </RigidBody>
       ))}
 
-      {/* 6. FLOWER BEDS & SHRUB CLUSTERS */}
+      {/* 8. FLOWER BEDS */}
       {flowerBeds.map((fb, idx) => (
         <group key={idx} position={fb.pos as [number, number, number]}>
-          {/* Raised Soil Mound */}
           <mesh receiveShadow position={[0, 0.08, 0]}>
             <cylinderGeometry args={[1.1, 1.3, 0.16, 12]} />
             <meshStandardMaterial color="#3e2723" roughness={0.95} />
           </mesh>
-          {/* Flower Blossoms */}
           <mesh castShadow position={[0, 0.22, 0]}>
             <dodecahedronGeometry args={[0.45, 0]} />
             <meshStandardMaterial color={fb.color} roughness={0.6} />
@@ -412,10 +521,9 @@ export function TownMap({ phase }: TownMapProps) {
         </group>
       ))}
 
-      {/* 7. STREETLAMPS & WARM POINTLIGHTS */}
+      {/* 9. STREETLAMPS WITH WARM ILLUMINATION */}
       {streetlamps.map((pos, idx) => (
         <group key={idx} position={pos as [number, number, number]}>
-          {/* Lamp Base & Fluted Cast-Iron Post */}
           <mesh position={[0, 0.2, 0]} castShadow>
             <cylinderGeometry args={[0.25, 0.35, 0.4, 8]} />
             <meshStandardMaterial color="#0f172a" metalness={0.8} roughness={0.3} />
@@ -424,12 +532,10 @@ export function TownMap({ phase }: TownMapProps) {
             <cylinderGeometry args={[0.08, 0.12, 3.8, 8]} />
             <meshStandardMaterial color="#0f172a" metalness={0.8} roughness={0.3} />
           </mesh>
-          {/* Lamp Cross-Arm Bracket */}
           <mesh position={[0, 4.0, 0]}>
             <boxGeometry args={[0.8, 0.1, 0.2]} />
             <meshStandardMaterial color="#0f172a" metalness={0.8} roughness={0.3} />
           </mesh>
-          {/* Lamp Lantern */}
           <mesh position={[0, 4.25, 0]}>
             <boxGeometry args={[0.45, 0.55, 0.45]} />
             <meshStandardMaterial
@@ -438,18 +544,113 @@ export function TownMap({ phase }: TownMapProps) {
               emissiveIntensity={isNight ? 3.0 : 1.0}
             />
           </mesh>
-          {/* Warm Amber Point Light */}
           <pointLight
             position={[0, 4.1, 0]}
             color="#f59e0b"
             intensity={isNight ? 3.8 : 1.2}
-            distance={15}
+            distance={16}
             decay={2}
           />
         </group>
       ))}
 
-      {/* 8. SURROUNDING MULTI-STORY CITY BUILDINGS (With Solid Rapier Colliders) */}
+      {/* 10. ZONE B: SURROUNDING CITY STREETS & RAISED SIDEWALKS WITH SOLID COLLIDERS */}
+      {/* North Avenue (z = -44, width 10m asphalt) */}
+      <mesh receiveShadow position={[0, 0.01, -44]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[110, 10]} />
+        <meshStandardMaterial color="#0f172a" roughness={0.9} />
+      </mesh>
+      {/* South Avenue (z = 44, width 10m asphalt) */}
+      <mesh receiveShadow position={[0, 0.01, 44]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[110, 10]} />
+        <meshStandardMaterial color="#0f172a" roughness={0.9} />
+      </mesh>
+      {/* West Boulevard (x = -44, width 10m asphalt) */}
+      <mesh receiveShadow position={[-44, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[10, 110]} />
+        <meshStandardMaterial color="#0f172a" roughness={0.9} />
+      </mesh>
+      {/* East Boulevard (x = 44, width 10m asphalt) */}
+      <mesh receiveShadow position={[44, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[10, 110]} />
+        <meshStandardMaterial color="#0f172a" roughness={0.9} />
+      </mesh>
+
+      {/* Road Markings: Dashed Yellow Center Divider Lines */}
+      <mesh position={[0, 0.02, -44]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[95, 0.2]} />
+        <meshBasicMaterial color="#eab308" />
+      </mesh>
+      <mesh position={[0, 0.02, 44]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[95, 0.2]} />
+        <meshBasicMaterial color="#eab308" />
+      </mesh>
+      <mesh position={[-44, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.2, 95]} />
+        <meshBasicMaterial color="#eab308" />
+      </mesh>
+      <mesh position={[44, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.2, 95]} />
+        <meshBasicMaterial color="#eab308" />
+      </mesh>
+
+      {/* Raised Sidewalks with Solid Cuboid Colliders (height = 0.14m, top at y = 0.14m) */}
+      {/* North Park Sidewalk */}
+      <RigidBody type="fixed" colliders="cuboid" position={[0, 0.07, -38.2]}>
+        <mesh receiveShadow castShadow>
+          <boxGeometry args={[78, 0.14, 2.4]} />
+          <meshStandardMaterial color="#475569" roughness={0.7} />
+        </mesh>
+      </RigidBody>
+      {/* South Park Sidewalk */}
+      <RigidBody type="fixed" colliders="cuboid" position={[0, 0.07, 38.2]}>
+        <mesh receiveShadow castShadow>
+          <boxGeometry args={[78, 0.14, 2.4]} />
+          <meshStandardMaterial color="#475569" roughness={0.7} />
+        </mesh>
+      </RigidBody>
+      {/* West Park Sidewalk */}
+      <RigidBody type="fixed" colliders="cuboid" position={[-38.2, 0.07, 0]}>
+        <mesh receiveShadow castShadow>
+          <boxGeometry args={[2.4, 0.14, 78]} />
+          <meshStandardMaterial color="#475569" roughness={0.7} />
+        </mesh>
+      </RigidBody>
+      {/* East Park Sidewalk */}
+      <RigidBody type="fixed" colliders="cuboid" position={[38.2, 0.07, 0]}>
+        <mesh receiveShadow castShadow>
+          <boxGeometry args={[2.4, 0.14, 78]} />
+          <meshStandardMaterial color="#475569" roughness={0.7} />
+        </mesh>
+      </RigidBody>
+
+      {/* Building Outer Sidewalks */}
+      <RigidBody type="fixed" colliders="cuboid" position={[0, 0.07, -50]}>
+        <mesh receiveShadow castShadow>
+          <boxGeometry args={[116, 0.14, 2.5]} />
+          <meshStandardMaterial color="#334155" roughness={0.7} />
+        </mesh>
+      </RigidBody>
+      <RigidBody type="fixed" colliders="cuboid" position={[0, 0.07, 50]}>
+        <mesh receiveShadow castShadow>
+          <boxGeometry args={[116, 0.14, 2.5]} />
+          <meshStandardMaterial color="#334155" roughness={0.7} />
+        </mesh>
+      </RigidBody>
+      <RigidBody type="fixed" colliders="cuboid" position={[-50, 0.07, 0]}>
+        <mesh receiveShadow castShadow>
+          <boxGeometry args={[2.5, 0.14, 116]} />
+          <meshStandardMaterial color="#334155" roughness={0.7} />
+        </mesh>
+      </RigidBody>
+      <RigidBody type="fixed" colliders="cuboid" position={[50, 0.07, 0]}>
+        <mesh receiveShadow castShadow>
+          <boxGeometry args={[2.5, 0.14, 116]} />
+          <meshStandardMaterial color="#334155" roughness={0.7} />
+        </mesh>
+      </RigidBody>
+
+      {/* 11. SURROUNDING MULTI-STORY CITY BUILDINGS (WITH SOLID RAPIER COLLIDERS) */}
       {buildings.map((b, idx) => (
         <RigidBody
           key={idx}
@@ -531,18 +732,18 @@ export function TownMap({ phase }: TownMapProps) {
         </RigidBody>
       ))}
 
-      {/* 9. INVISIBLE PARK BOUNDARY WALLS (Prevents falling off world) */}
-      <RigidBody type="fixed" colliders="cuboid" position={[0, 6, -42]}>
-        <CuboidCollider args={[44, 12, 1]} />
+      {/* 12. INVISIBLE CITY BOUNDARY WALLS (Expanded 152m x 152m Perimeter) */}
+      <RigidBody type="fixed" colliders="cuboid" position={[0, 8, -76]}>
+        <CuboidCollider args={[78, 16, 1]} />
       </RigidBody>
-      <RigidBody type="fixed" colliders="cuboid" position={[0, 6, 42]}>
-        <CuboidCollider args={[44, 12, 1]} />
+      <RigidBody type="fixed" colliders="cuboid" position={[0, 8, 76]}>
+        <CuboidCollider args={[78, 16, 1]} />
       </RigidBody>
-      <RigidBody type="fixed" colliders="cuboid" position={[-42, 6, 0]}>
-        <CuboidCollider args={[1, 12, 44]} />
+      <RigidBody type="fixed" colliders="cuboid" position={[-76, 8, 0]}>
+        <CuboidCollider args={[1, 16, 78]} />
       </RigidBody>
-      <RigidBody type="fixed" colliders="cuboid" position={[42, 6, 0]}>
-        <CuboidCollider args={[1, 12, 44]} />
+      <RigidBody type="fixed" colliders="cuboid" position={[76, 8, 0]}>
+        <CuboidCollider args={[1, 16, 78]} />
       </RigidBody>
     </group>
   );
