@@ -7,6 +7,9 @@ import {
   WinningTeam,
   calculateRoleCounts,
   distributeRoles,
+  distributeRolesManual,
+  validateManualMafiaAssignment,
+  validateExactMafiaCount,
   validateMafiaPercentage,
   countPublicVotes,
   countNightMafiaVotes,
@@ -40,6 +43,7 @@ export class MafiaRoom extends Room<MafiaRoomState> {
   // Authoritative private state (NEVER exposed to public schema)
   private secretRoles: Map<string, Role> = new Map();
   private reconnectionSessions: Map<string, ReconnectionSession> = new Map();
+  private manualMafiaIds: string[] = [];
 
   // Active voting ballots
   private nightBallots: Map<string, string> = new Map(); // mafiaId -> targetCitizenId
@@ -104,9 +108,25 @@ export class MafiaRoom extends Room<MafiaRoomState> {
 
         const minDuration = this.state.config.isDevMode ? 1 : 5;
 
+        if (typeof data.assignmentMethod === "string" && (data.assignmentMethod === "RANDOM" || data.assignmentMethod === "MANUAL")) {
+          this.state.config.assignmentMethod = data.assignmentMethod;
+        }
+
+        if (typeof data.mafiaCount === "number" && Number.isInteger(data.mafiaCount) && data.mafiaCount >= 0) {
+          if (data.mafiaCount > 0) {
+            validateExactMafiaCount(this.state.players.size || 5, data.mafiaCount, this.state.config.isDevMode);
+          }
+          this.state.config.mafiaCount = data.mafiaCount;
+        }
+
         if (typeof data.mafiaPercentage === "number") {
           validateMafiaPercentage(data.mafiaPercentage);
           this.state.config.mafiaPercentage = data.mafiaPercentage;
+        }
+
+        if (typeof data.dayDurationSec === "number" && data.dayDurationSec >= minDuration && data.dayDurationSec <= 300) {
+          this.state.config.dayDurationSec = data.dayDurationSec;
+          this.state.config.discussionDurationSec = data.dayDurationSec;
         }
 
         if (typeof data.nightDurationSec === "number" && data.nightDurationSec >= minDuration && data.nightDurationSec <= 120) {
@@ -115,6 +135,7 @@ export class MafiaRoom extends Room<MafiaRoomState> {
 
         if (typeof data.discussionDurationSec === "number" && data.discussionDurationSec >= minDuration && data.discussionDurationSec <= 300) {
           this.state.config.discussionDurationSec = data.discussionDurationSec;
+          this.state.config.dayDurationSec = data.discussionDurationSec;
         }
 
         if (typeof data.votingDurationSec === "number" && data.votingDurationSec >= minDuration && data.votingDurationSec <= 120) {
@@ -143,6 +164,34 @@ export class MafiaRoom extends Room<MafiaRoomState> {
       }
     });
 
+    // 2.1 Set manual Mafia selection (Host only, WAITING_FOR_PLAYERS only)
+    this.onMessage(ClientMessageType.SET_MANUAL_MAFIA, (client, data: { mafiaPlayerIds: string[] }) => {
+      if (this.state.phase !== Phase.WAITING_FOR_PLAYERS) return;
+      if (client.sessionId !== this.state.hostId) {
+        client.send(ServerMessageType.ERROR_NOTIFICATION, {
+          message: "Only the room host can manually assign Mafia roles."
+        });
+        return;
+      }
+
+      try {
+        const playerIds = Array.from(this.state.players.keys());
+        const expectedCount = (this.state.config.mafiaCount && this.state.config.mafiaCount > 0)
+          ? this.state.config.mafiaCount
+          : calculateRoleCounts(playerIds.length, this.state.config.mafiaPercentage, this.state.config.isDevMode).mafiaCount;
+
+        validateManualMafiaAssignment(playerIds, data.mafiaPlayerIds || [], expectedCount);
+        this.manualMafiaIds = [...data.mafiaPlayerIds];
+        client.send(ServerMessageType.MANUAL_MAFIA_CONFIRMED, {
+          mafiaPlayerIds: this.manualMafiaIds
+        });
+      } catch (err: any) {
+        client.send(ServerMessageType.ERROR_NOTIFICATION, {
+          message: err.message || "Failed to set manual Mafia selection."
+        });
+      }
+    });
+
     // 3. Start game (Host only)
     this.onMessage(ClientMessageType.START_GAME, (client) => {
       if (this.state.phase !== Phase.WAITING_FOR_PLAYERS) return;
@@ -163,7 +212,29 @@ export class MafiaRoom extends Room<MafiaRoomState> {
         return;
       }
 
+      // If manual assignment method, validate selection before starting
+      if (this.state.config.assignmentMethod === "MANUAL") {
+        const playerIds = Array.from(this.state.players.keys());
+        const expectedCount = (this.state.config.mafiaCount && this.state.config.mafiaCount > 0)
+          ? this.state.config.mafiaCount
+          : calculateRoleCounts(playerIds.length, this.state.config.mafiaPercentage, this.state.config.isDevMode).mafiaCount;
+
+        try {
+          validateManualMafiaAssignment(playerIds, this.manualMafiaIds, expectedCount);
+        } catch (err: any) {
+          client.send(ServerMessageType.ERROR_NOTIFICATION, {
+            message: `Cannot start match: ${err.message}`
+          });
+          return;
+        }
+      }
+
       this.startGame();
+    });
+
+    // 3.5. On-Demand Role Retrieval (for client lifecycle & late HUD mounting)
+    this.onMessage(ClientMessageType.GET_ROLE, (client) => {
+      this.sendRoleToClient(client);
     });
 
     // 4. Night Mafia Target Vote
@@ -202,9 +273,13 @@ export class MafiaRoom extends Room<MafiaRoomState> {
       });
     });
 
-    // 5. Day Public Vote
+    // 5. Day Public Vote (Unified day phase: DAY_DISCUSSION, or legacy DAY_VOTING / REVOTING)
     this.onMessage(ClientMessageType.CAST_VOTE, (client, data: { targetId: string }) => {
-      if (this.state.phase !== Phase.DAY_VOTING && this.state.phase !== Phase.REVOTING) return;
+      if (
+        this.state.phase !== Phase.DAY_DISCUSSION &&
+        this.state.phase !== Phase.DAY_VOTING &&
+        this.state.phase !== Phase.REVOTING
+      ) return;
 
       const player = this.state.players.get(client.sessionId);
       if (!player || !player.isAlive) {
@@ -247,10 +322,10 @@ export class MafiaRoom extends Room<MafiaRoomState> {
       const livingVoters = this.getLivingPlayerIds();
       if (this.dayBallots.size >= livingVoters.length) {
         this.clearPhaseTimer();
-        if (this.state.phase === Phase.DAY_VOTING) {
-          this.evaluateDayVoting();
-        } else {
+        if (this.state.phase === Phase.REVOTING) {
           this.evaluateRevote();
+        } else {
+          this.evaluateDayVoting();
         }
       }
     });
@@ -278,12 +353,47 @@ export class MafiaRoom extends Room<MafiaRoomState> {
       }
     });
 
-    // 7. Public / Lobby Chat
-    this.onMessage(ClientMessageType.SEND_CHAT, (client, data: { message: string }) => {
+    // 7. Public & Private Mafia Chat
+    this.onMessage(ClientMessageType.SEND_CHAT, (client, data: { message: string; channel?: "PUBLIC" | "MAFIA" }) => {
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
 
-      // Disallow dead player chatting during active match phases
+      const trimmed = (data.message || "").trim();
+      if (!trimmed || trimmed.length > 250) return;
+
+      const channel = data.channel === "MAFIA" ? "MAFIA" : "PUBLIC";
+
+      // Private Mafia Chat Authorization
+      if (channel === "MAFIA") {
+        const role = this.secretRoles.get(client.sessionId);
+        if (role !== Role.MAFIA) {
+          client.send(ServerMessageType.ERROR_NOTIFICATION, {
+            message: "Access Denied: Only Mafia syndicate members can transmit on this channel."
+          });
+          return;
+        }
+
+        if (!player.isAlive) {
+          client.send(ServerMessageType.ERROR_NOTIFICATION, {
+            message: "Eliminated Mafia members cannot transmit in syndicate chat."
+          });
+          return;
+        }
+
+        const chatPayload: ChatMessagePayload = {
+          senderId: player.id,
+          senderName: player.displayName,
+          channel: "MAFIA",
+          message: trimmed,
+          timestamp: Date.now()
+        };
+
+        // Broadcast STRICTLY to living Mafia members
+        this.broadcastToLivingMafia(ServerMessageType.CHAT_MESSAGE, chatPayload);
+        return;
+      }
+
+      // Public Chat Authorization
       if (
         this.state.phase !== Phase.WAITING_FOR_PLAYERS &&
         this.state.phase !== Phase.VICTORY &&
@@ -294,9 +404,6 @@ export class MafiaRoom extends Room<MafiaRoomState> {
         });
         return;
       }
-
-      const trimmed = (data.message || "").trim();
-      if (!trimmed || trimmed.length > 250) return;
 
       const chatPayload: ChatMessagePayload = {
         senderId: player.id,
@@ -330,6 +437,7 @@ export class MafiaRoom extends Room<MafiaRoomState> {
       this.eliminatedPlayerId = null;
       this.tiedRunoffCandidates = [];
       this.currentRevoteCount = 0;
+      this.manualMafiaIds = [];
 
       this.state.players.forEach((p) => {
         p.isAlive = true;
@@ -341,7 +449,7 @@ export class MafiaRoom extends Room<MafiaRoomState> {
       });
     });
 
-    // 8. WebRTC Proximity Voice Signaling
+    // 8. WebRTC Proximity & Role-Gated Voice Signaling
     this.onMessage(ClientMessageType.VOICE_SIGNAL, (client, data: VoiceSignalPayload) => {
       if (!data || !data.targetSessionId || !data.signal) return;
 
@@ -349,15 +457,29 @@ export class MafiaRoom extends Room<MafiaRoomState> {
       const target = this.state.players.get(data.targetSessionId);
       if (!sender || !target) return;
 
-      // Enforce dead player channel isolation during active rounds:
-      // If the sender is eliminated and the target is living, do NOT forward voice signals.
-      // Dead players cannot transmit to living players during active gameplay.
       const isMatchActive =
         this.state.phase !== Phase.WAITING_FOR_PLAYERS &&
         this.state.phase !== Phase.VICTORY;
 
+      // 1. Dead player restriction: dead cannot transmit to living during active match
       if (isMatchActive && !sender.isAlive && target.isAlive) {
         return; // Dropped to preserve competitive integrity
+      }
+
+      // 2. Night Phase Voice Isolation:
+      // During NIGHT, living Mafia have a private voice channel.
+      // Citizens must not hear Mafia, Mafia must not hear Citizens, and sleeping Citizens cannot talk to each other.
+      if (isMatchActive && this.state.phase === Phase.NIGHT) {
+        const senderRole = this.secretRoles.get(client.sessionId);
+        const targetRole = this.secretRoles.get(data.targetSessionId);
+
+        const senderIsLivingMafia = senderRole === Role.MAFIA && sender.isAlive;
+        const targetIsLivingMafia = targetRole === Role.MAFIA && target.isAlive;
+
+        // Only allow signaling between two living Mafia members during the night
+        if (!senderIsLivingMafia || !targetIsLivingMafia) {
+          return;
+        }
       }
 
       // Find target client connection
@@ -395,7 +517,19 @@ export class MafiaRoom extends Room<MafiaRoomState> {
 
     // Distribute roles authoritatively in private server memory
     const playerIds = Array.from(this.state.players.keys());
-    this.secretRoles = distributeRoles(playerIds, this.state.config.mafiaPercentage, this.state.config.isDevMode);
+    if (this.state.config.assignmentMethod === "MANUAL") {
+      const expectedCount = (this.state.config.mafiaCount && this.state.config.mafiaCount > 0)
+        ? this.state.config.mafiaCount
+        : calculateRoleCounts(playerIds.length, this.state.config.mafiaPercentage, this.state.config.isDevMode).mafiaCount;
+      this.secretRoles = distributeRolesManual(playerIds, this.manualMafiaIds, expectedCount);
+    } else {
+      this.secretRoles = distributeRoles(
+        playerIds,
+        this.state.config.mafiaPercentage,
+        this.state.config.isDevMode,
+        this.state.config.mafiaCount > 0 ? this.state.config.mafiaCount : undefined
+      );
+    }
 
     // Identify living Mafia for teammate reveal
     const mafiaTeammates: Array<{ id: string; displayName: string }> = [];
@@ -408,17 +542,7 @@ export class MafiaRoom extends Room<MafiaRoomState> {
 
     // Dispatch STRICTLY PRIVATE messages to clients
     for (const client of this.clients) {
-      const role = this.secretRoles.get(client.sessionId);
-      if (role === Role.MAFIA) {
-        client.send(ServerMessageType.ROLE_ASSIGNMENT, {
-          role: Role.MAFIA,
-          teammates: mafiaTeammates
-        });
-      } else {
-        client.send(ServerMessageType.ROLE_ASSIGNMENT, {
-          role: Role.CITIZEN
-        });
-      }
+      this.sendRoleToClient(client);
     }
 
     this.broadcast(ServerMessageType.SYSTEM_NOTIFICATION, {
@@ -428,6 +552,33 @@ export class MafiaRoom extends Room<MafiaRoomState> {
     // Reveal phase (1s in dev mode, 5s default) -> transition to Night
     const introDuration = this.state.config.isDevMode ? 1 : 5;
     this.startPhaseTimer(introDuration, () => this.startNightPhase());
+  }
+
+  /**
+   * Authoritatively sends secret role and Syndicate teammates to an individual client.
+   */
+  private sendRoleToClient(client: Client) {
+    if (this.state.phase === Phase.WAITING_FOR_PLAYERS) return;
+    const role = this.secretRoles.get(client.sessionId);
+    if (!role) return;
+
+    if (role === Role.MAFIA) {
+      const mafiaTeammates: Array<{ id: string; displayName: string }> = [];
+      for (const [id, r] of this.secretRoles.entries()) {
+        if (r === Role.MAFIA) {
+          const p = this.state.players.get(id);
+          if (p) mafiaTeammates.push({ id, displayName: p.displayName });
+        }
+      }
+      client.send(ServerMessageType.ROLE_ASSIGNMENT, {
+        role: Role.MAFIA,
+        teammates: mafiaTeammates
+      });
+    } else {
+      client.send(ServerMessageType.ROLE_ASSIGNMENT, {
+        role: Role.CITIZEN
+      });
+    }
   }
 
   private startNightPhase() {
@@ -504,42 +655,41 @@ export class MafiaRoom extends Room<MafiaRoomState> {
     if (victory.isGameOver) {
       this.startPhaseTimer(duration, () => this.handleVictory(victory.winningTeam!, victory.reason!));
     } else {
-      this.startPhaseTimer(duration, () => this.startDayDiscussion());
+      this.startPhaseTimer(duration, () => this.startDayPhase());
     }
   }
 
-  private startDayDiscussion() {
+  /**
+   * Unified Day Phase:
+   * Combines debate, discussion, and public voting under a single authoritative day timer.
+   * Voting is live immediately upon day start.
+   */
+  private startDayPhase() {
     this.clearPhaseTimer();
     this.state.phase = Phase.DAY_DISCUSSION;
+    this.dayBallots.clear();
+    this.currentRevoteCount = 0;
+    this.tiedRunoffCandidates = [];
+    this.eliminatedPlayerId = null;
 
     const duration = this.state.config.discussionDurationSec;
     this.state.phaseStartedAt = Date.now();
     this.state.phaseEndsAt = Date.now() + duration * 1000;
 
     this.broadcast(ServerMessageType.SYSTEM_NOTIFICATION, {
-      message: `Day ${this.state.roundNumber} discussion has begun. Discuss evidence and share suspicions.`
-    });
-
-    this.startPhaseTimer(duration, () => this.startDayVoting());
-  }
-
-  private startDayVoting() {
-    this.clearPhaseTimer();
-    this.state.phase = Phase.DAY_VOTING;
-    this.dayBallots.clear();
-    this.currentRevoteCount = 0;
-    this.tiedRunoffCandidates = [];
-    this.eliminatedPlayerId = null;
-
-    const duration = this.state.config.votingDurationSec;
-    this.state.phaseStartedAt = Date.now();
-    this.state.phaseEndsAt = Date.now() + duration * 1000;
-
-    this.broadcast(ServerMessageType.SYSTEM_NOTIFICATION, {
-      message: `Day ${this.state.roundNumber} public voting has begun! Vote for a player to eliminate (Requires >= 50% majority).`
+      message: `Day ${this.state.roundNumber} has begun. Discuss evidence and cast your votes to eliminate suspects (Requires >= 50% majority).`
     });
 
     this.startPhaseTimer(duration, () => this.evaluateDayVoting());
+  }
+
+  // Compatibility aliases
+  private startDayDiscussion() {
+    this.startDayPhase();
+  }
+
+  private startDayVoting() {
+    this.startDayPhase();
   }
 
   private evaluateDayVoting() {
@@ -834,6 +984,8 @@ export class MafiaRoom extends Room<MafiaRoomState> {
       this.broadcast(ServerMessageType.SYSTEM_NOTIFICATION, {
         message: `${player.displayName} reconnected!`
       });
+      // Re-send classified role to reconnected player
+      this.sendRoleToClient(client);
     } catch (err) {
       console.log(`[MafiaRoom] 60s grace window expired for ${player.displayName}.`);
       this.handlePlayerAbandoned(client.sessionId);

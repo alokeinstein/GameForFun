@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   calculateRoleCounts,
   distributeRoles,
+  distributeRolesManual,
   MIN_PLAYERS_PRODUCTION,
   MIN_PLAYERS_DEV
 } from "../src/roles.js";
@@ -83,6 +84,44 @@ describe("Role Distribution & Count Rules", () => {
 
     expect(hostRoles.has(Role.MAFIA)).toBe(true);
     expect(hostRoles.has(Role.CITIZEN)).toBe(true);
+  });
+
+  it("supports exact Mafia count configuration (e.g. 10 players -> 3 Mafia, 7 Citizens)", () => {
+    const counts = calculateRoleCounts(10, 20, false, 3);
+    expect(counts.mafiaCount).toBe(3);
+    expect(counts.citizenCount).toBe(7);
+
+    const playerIds = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10"];
+    const roleMap = distributeRoles(playerIds, 20, false, 3);
+    expect(roleMap.size).toBe(10);
+
+    let mafia = 0;
+    let citizens = 0;
+    for (const [_, role] of roleMap) {
+      if (role === Role.MAFIA) mafia++;
+      if (role === Role.CITIZEN) citizens++;
+    }
+    expect(mafia).toBe(3);
+    expect(citizens).toBe(7);
+  });
+
+  it("validates manual Mafia assignment correctly", () => {
+    const playerIds = ["p1", "p2", "p3", "p4", "p5"];
+    const selected = ["p2", "p4"];
+    const roleMap = distributeRolesManual(playerIds, selected, 2);
+
+    expect(roleMap.get("p2")).toBe(Role.MAFIA);
+    expect(roleMap.get("p4")).toBe(Role.MAFIA);
+    expect(roleMap.get("p1")).toBe(Role.CITIZEN);
+    expect(roleMap.get("p3")).toBe(Role.CITIZEN);
+    expect(roleMap.get("p5")).toBe(Role.CITIZEN);
+  });
+
+  it("rejects invalid manual assignments (count mismatch, duplicates, nonexistent players)", () => {
+    const playerIds = ["p1", "p2", "p3", "p4", "p5"];
+    expect(() => distributeRolesManual(playerIds, ["p1"], 2)).toThrow(/Manual assignment mismatch/);
+    expect(() => distributeRolesManual(playerIds, ["p1", "p1"], 2)).toThrow(/Duplicate players/);
+    expect(() => distributeRolesManual(playerIds, ["p1", "hacker"], 2)).toThrow(/not connected/);
   });
 });
 

@@ -71,7 +71,7 @@ export function CharacterAvatar({
   return (
     <group position={[0, isAlive ? 0 : 0.5, 0]}>
       {/* Floating Name Tag */}
-      <Html position={[0, 2.35, 0]} center distanceFactor={14}>
+      <Html position={[0, 2.35, 0]} center distanceFactor={14} zIndexRange={[100, 0]}>
         <div className="flex flex-col items-center pointer-events-none select-none">
           <div className={`flex items-center space-x-1 px-2 py-0.5 rounded-full bg-noir-950/80 border shadow-lg text-[11px] font-bold font-mono tracking-wide text-white whitespace-nowrap transition-colors ${
             isSpeaking ? "border-emerald-500 ring-2 ring-emerald-500/40" : "border-noir-700/80"

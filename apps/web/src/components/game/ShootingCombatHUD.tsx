@@ -8,11 +8,8 @@ import {
   RotateCcw,
   Clock,
   Trophy,
-  Users,
-  Target,
-  Flame,
-  Radio,
-  ChevronRight
+  ChevronRight,
+  Settings
 } from "lucide-react";
 import {
   ServerMessageType,
@@ -25,6 +22,13 @@ import {
   ShootingKillFeedPayload
 } from "@mafia/shared";
 import { combatAudio } from "../../utils/combatAudio";
+import { ShootingSniperScope } from "../canvas/ShootingSniperScope";
+import { ShootingDeathLoadoutModal } from "./ShootingDeathLoadoutModal";
+import { ShootingSettingsModal } from "./ShootingSettingsModal";
+import {
+  loadShootingSettings,
+  ShootingControlSettings
+} from "../../utils/shootingSettings";
 
 interface ShootingCombatHUDProps {
   room: Room<ShootingRoomState>;
@@ -54,6 +58,9 @@ export function ShootingCombatHUD({
   const [timeLeftSec, setTimeLeftSec] = useState(0);
   const [hitmarker, setHitmarker] = useState<{ active: boolean; isHeadshot: boolean } | null>(null);
   const [killfeed, setKillfeed] = useState<Array<ShootingKillFeedPayload & { id: string }>>([]);
+  const [isAiming, setIsAiming] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState<ShootingControlSettings>(loadShootingSettings());
 
   useEffect(() => {
     const updateTime = () => {
@@ -66,6 +73,11 @@ export function ShootingCombatHUD({
   }, [phaseEndsAt]);
 
   useEffect(() => {
+    const handleAdsEvent = (e: any) => {
+      setIsAiming(!!e.detail?.isAiming);
+    };
+    window.addEventListener("shooting:ads", handleAdsEvent);
+
     room.onMessage(ServerMessageType.SHOOTING_HIT_EVENT, (payload: ShootingHitEventPayload) => {
       if (payload.attackerId === sessionId) {
         setHitmarker({ active: true, isHeadshot: payload.isHeadshot });
@@ -87,6 +99,10 @@ export function ShootingCombatHUD({
         setKillfeed((prev) => prev.filter((item) => item.id !== entry.id));
       }, 5000);
     });
+
+    return () => {
+      window.removeEventListener("shooting:ads", handleAdsEvent);
+    };
   }, [room, sessionId]);
 
   const localPlayer = players.find((p) => p.id === sessionId);
@@ -95,6 +111,7 @@ export function ShootingCombatHUD({
 
   const weaponId = (localPlayer?.weaponId as WeaponId) || WeaponId.ASSAULT_RIFLE;
   const currentWeapon = WEAPONS_CATALOG[weaponId] || WEAPONS_CATALOG[WeaponId.ASSAULT_RIFLE];
+  const isSniperAiming = isAiming && weaponId === WeaponId.SNIPER_RIFLE;
 
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -102,12 +119,44 @@ export function ShootingCombatHUD({
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   };
 
+  const handleSaveSettings = (newSettings: ShootingControlSettings) => {
+    setSettings(newSettings);
+    window.dispatchEvent(new CustomEvent("shooting:settings_updated"));
+  };
+
   return (
     <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 sm:p-6 z-20 select-none">
       {/* -------------------------------------------------------------------- */}
-      {/* TOP HUD: MATCH STATUS, SCORES & TIMER                                */}
+      {/* FULL-SCREEN SNIPER OPTIC SCOPE OVERLAY                               */}
       {/* -------------------------------------------------------------------- */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+      <ShootingSniperScope active={isSniperAiming} />
+
+      {/* -------------------------------------------------------------------- */}
+      {/* SETTINGS MODAL                                                       */}
+      {/* -------------------------------------------------------------------- */}
+      <ShootingSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        settings={settings}
+        onSave={handleSaveSettings}
+      />
+
+      {/* -------------------------------------------------------------------- */}
+      {/* DEATH & RESPAWN WEAPON SELECTION OVERLAY                             */}
+      {/* -------------------------------------------------------------------- */}
+      {localPlayer && (
+        <ShootingDeathLoadoutModal
+          room={room}
+          currentWeaponId={weaponId}
+          respawnDelaySec={room.state.config?.respawnDelaySec || 4}
+          isAlive={localPlayer.isAlive}
+        />
+      )}
+
+      {/* -------------------------------------------------------------------- */}
+      {/* TOP HUD: MATCH STATUS, SCORES, TIMER & SETTINGS                      */}
+      {/* -------------------------------------------------------------------- */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pointer-events-auto">
         {/* Left: Mode & Map Badge */}
         <div className="flex items-center space-x-3 bg-noir-950/85 backdrop-blur-md border border-noir-800 rounded-2xl px-4 py-2.5 shadow-xl">
           <div className="w-8 h-8 rounded-xl bg-emerald-600/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
@@ -152,12 +201,21 @@ export function ShootingCombatHUD({
           </div>
         </div>
 
-        {/* Right: Score Goal & Host Rematch Action */}
-        <div className="flex items-center space-x-3 pointer-events-auto">
+        {/* Right: Score Goal, Settings & Host Rematch Action */}
+        <div className="flex items-center space-x-2.5 pointer-events-auto">
           <div className="hidden sm:flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-noir-950/80 border border-noir-800 text-[11px] font-mono text-noir-300">
             <Trophy className="w-3.5 h-3.5 text-amber-400" />
             <span>Limit: <strong className="text-white">{scoreLimit} Kills</strong></span>
           </div>
+
+          {/* Settings Button */}
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-2 rounded-xl bg-noir-900/90 hover:bg-noir-800 border border-noir-700 text-noir-300 hover:text-white transition shadow-lg"
+            title="Open Controls & Mouse Settings"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
 
           {isHost && (
             <button
@@ -208,52 +266,50 @@ export function ShootingCombatHUD({
       </div>
 
       {/* -------------------------------------------------------------------- */}
-      {/* CENTER CROSSHAIR & DYNAMIC HITMARKER                                 */}
+      {/* CENTER CROSSHAIR & DYNAMIC HITMARKER (Hidden when Sniper Scope active) */}
       {/* -------------------------------------------------------------------- */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-        <div className="relative w-8 h-8 flex items-center justify-center">
-          {/* Center Point */}
-          <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full shadow-sm shadow-emerald-400/80" />
-          {/* Reticle Lines */}
-          <div className="absolute top-0 w-0.5 h-2 bg-white/70" />
-          <div className="absolute bottom-0 w-0.5 h-2 bg-white/70" />
-          <div className="absolute left-0 w-2 h-0.5 bg-white/70" />
-          <div className="absolute right-0 w-2 h-0.5 bg-white/70" />
+      {!isSniperAiming && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+          <div className="relative w-8 h-8 flex items-center justify-center">
+            {/* Center Precision Dot */}
+            <div
+              className={`w-1.5 h-1.5 rounded-full shadow-sm transition-all duration-150 ${
+                isAiming
+                  ? "bg-rose-500 shadow-rose-500/80 scale-125"
+                  : "bg-emerald-400 shadow-emerald-400/80"
+              }`}
+            />
+            {/* Reticle Hairlines */}
+            <div
+              className="absolute top-0 w-0.5 bg-white/75 transition-all duration-150"
+              style={{ height: isAiming ? "6px" : "8px" }}
+            />
+            <div
+              className="absolute bottom-0 w-0.5 bg-white/75 transition-all duration-150"
+              style={{ height: isAiming ? "6px" : "8px" }}
+            />
+            <div
+              className="absolute left-0 h-0.5 bg-white/75 transition-all duration-150"
+              style={{ width: isAiming ? "6px" : "8px" }}
+            />
+            <div
+              className="absolute right-0 h-0.5 bg-white/75 transition-all duration-150"
+              style={{ width: isAiming ? "6px" : "8px" }}
+            />
 
-          {/* Hitmarker 'X' Display */}
-          {hitmarker && hitmarker.active && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div
-                className={`relative w-6 h-6 flex items-center justify-center ${
-                  hitmarker.isHeadshot ? "text-rose-500 scale-125" : "text-amber-300"
-                }`}
-              >
-                <div className="absolute w-5 h-0.5 bg-current rotate-45 shadow-sm shadow-black" />
-                <div className="absolute w-5 h-0.5 bg-current -rotate-45 shadow-sm shadow-black" />
+            {/* Hitmarker 'X' Display */}
+            {hitmarker && hitmarker.active && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div
+                  className={`relative w-6 h-6 flex items-center justify-center ${
+                    hitmarker.isHeadshot ? "text-rose-500 scale-125" : "text-amber-300"
+                  }`}
+                >
+                  <div className="absolute w-5 h-0.5 bg-current rotate-45 shadow-sm shadow-black" />
+                  <div className="absolute w-5 h-0.5 bg-current -rotate-45 shadow-sm shadow-black" />
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* -------------------------------------------------------------------- */}
-      {/* ELIMINATED / RESPAWN OVERLAY                                         */}
-      {/* -------------------------------------------------------------------- */}
-      {localPlayer && !localPlayer.isAlive && (
-        <div className="absolute inset-0 bg-rose-950/40 backdrop-blur-sm flex flex-col items-center justify-center z-40 pointer-events-none">
-          <div className="bg-noir-950/90 border border-rose-600/40 rounded-3xl p-6 sm:p-8 text-center max-w-sm mx-4 shadow-2xl space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-rose-600/20 border border-rose-500/50 flex items-center justify-center mx-auto text-rose-400 text-2xl animate-pulse">
-              💀
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black font-mono text-white tracking-wider">
-              ELIMINATED
-            </h2>
-            <p className="text-xs font-mono text-rose-300/80">
-              Respawning at your team base shortly...
-            </p>
-            <div className="w-32 h-1 bg-noir-800 rounded-full mx-auto overflow-hidden">
-              <div className="h-full bg-rose-500 animate-pulse w-full" />
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -261,7 +317,7 @@ export function ShootingCombatHUD({
       {/* -------------------------------------------------------------------- */}
       {/* BOTTOM HUD: HEALTH, SHIELD, WEAPON AMMO & CONTROLS                   */}
       {/* -------------------------------------------------------------------- */}
-      <div className="flex flex-col sm:flex-row items-end justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-end justify-between gap-4 pointer-events-none">
         {/* Bottom-Left: Health & Shield Vitals */}
         <div className="bg-noir-950/85 backdrop-blur-md border border-noir-800 rounded-2xl p-4 w-full sm:w-64 space-y-2.5 shadow-2xl">
           <div className="flex items-center justify-between">
@@ -314,15 +370,17 @@ export function ShootingCombatHUD({
           <span>•</span>
           <span>Shift: Sprint</span>
           <span>•</span>
+          <span>C: Crouch</span>
+          <span>•</span>
           <span>Space: Jump</span>
           <span>•</span>
           <span className="text-emerald-400 font-bold">L-Click: Fire</span>
           <span>•</span>
-          <span className="text-blue-400 font-bold">R-Click: ADS</span>
+          <span className="text-blue-400 font-bold">R-Click: ADS Zoom</span>
           <span>•</span>
           <span className="text-amber-400 font-bold">[R]: Reload</span>
           <span>•</span>
-          <span>ESC: Free Mouse</span>
+          <span className="text-indigo-400 font-bold">[1-5]: Switch</span>
         </div>
 
         {/* Bottom-Right: Equipped Weapon & Ammunition */}

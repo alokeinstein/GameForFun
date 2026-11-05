@@ -3,6 +3,9 @@ import { DEFAULT_GAME_CONFIG } from "../constants.js";
 
 export class GameConfigState extends Schema {
   @type("number") mafiaPercentage: number = DEFAULT_GAME_CONFIG.mafiaPercentage;
+  @type("number") mafiaCount: number = DEFAULT_GAME_CONFIG.mafiaCount || 0;
+  @type("string") assignmentMethod: string = DEFAULT_GAME_CONFIG.assignmentMethod || "RANDOM";
+  @type("number") dayDurationSec: number = DEFAULT_GAME_CONFIG.dayDurationSec || 120;
   @type("number") nightDurationSec: number = DEFAULT_GAME_CONFIG.nightDurationSec;
   @type("number") discussionDurationSec: number = DEFAULT_GAME_CONFIG.discussionDurationSec;
   @type("number") votingDurationSec: number = DEFAULT_GAME_CONFIG.votingDurationSec;

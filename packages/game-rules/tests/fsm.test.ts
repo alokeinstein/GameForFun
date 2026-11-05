@@ -13,6 +13,9 @@ describe("State Machine & Transition Rules", () => {
     expect(isValidPhaseTransition(Phase.ROLE_ASSIGNMENT, Phase.NIGHT)).toBe(true);
     expect(isValidPhaseTransition(Phase.NIGHT, Phase.MORNING_ANNOUNCEMENT)).toBe(true);
     expect(isValidPhaseTransition(Phase.MORNING_ANNOUNCEMENT, Phase.DAY_DISCUSSION)).toBe(true);
+    expect(isValidPhaseTransition(Phase.DAY_DISCUSSION, Phase.ELIMINATION_ANNOUNCEMENT)).toBe(true);
+    expect(isValidPhaseTransition(Phase.DAY_DISCUSSION, Phase.REVOTING)).toBe(true);
+    expect(isValidPhaseTransition(Phase.DAY_DISCUSSION, Phase.NIGHT)).toBe(true);
     expect(isValidPhaseTransition(Phase.DAY_DISCUSSION, Phase.DAY_VOTING)).toBe(true);
     expect(isValidPhaseTransition(Phase.DAY_VOTING, Phase.ELIMINATION_ANNOUNCEMENT)).toBe(true);
     expect(isValidPhaseTransition(Phase.DAY_VOTING, Phase.REVOTING)).toBe(true);

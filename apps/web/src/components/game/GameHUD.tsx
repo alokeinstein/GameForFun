@@ -37,7 +37,9 @@ import {
   Mic,
   MicOff,
   Volume2,
-  VolumeX
+  VolumeX,
+  X,
+  MousePointer
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { audioManager } from "../../services/audio";
@@ -61,6 +63,7 @@ export interface ChatItem {
   message: string;
   isSystem?: boolean;
   timestamp: number;
+  channel?: "PUBLIC" | "MAFIA" | "DEAD";
 }
 
 interface GameHUDProps {
@@ -74,7 +77,10 @@ interface GameHUDProps {
   winningTeam: string;
   isHost: boolean;
   chatMessages: ChatItem[];
-  onSendChat: (msg: string) => void;
+  myRole?: Role | null;
+  mafiaTeammates?: Array<{ id: string; displayName: string }>;
+  allRevealedRoles?: Record<string, { displayName: string; role: Role }> | null;
+  onSendChat: (msg: string, channel?: "PUBLIC" | "MAFIA") => void;
   onReturnToLobby?: () => void;
   onLeaveRoom?: () => void;
 }
@@ -82,54 +88,129 @@ interface GameHUDProps {
 function ChatWidget({
   isAlive,
   phase,
+  myRole,
   chatMessages,
-  chatInput,
-  setChatInput,
-  handleChatSubmit,
+  onSendChat,
   heightClass = "h-[560px]"
 }: {
   isAlive: boolean;
   phase: string;
+  myRole: Role | null;
   chatMessages: ChatItem[];
-  chatInput: string;
-  setChatInput: (val: string) => void;
-  handleChatSubmit: (e: React.FormEvent) => void;
+  onSendChat: (msg: string, channel: "PUBLIC" | "MAFIA") => void;
   heightClass?: string;
 }) {
+  const [activeChannel, setActiveChannel] = useState<"PUBLIC" | "MAFIA">("PUBLIC");
+  const [chatInput, setChatInput] = useState("");
+  const isLivingMafia = myRole === Role.MAFIA && isAlive;
+
+  // Non-mafia or eliminated players are restricted to PUBLIC
+  const effectiveChannel = isLivingMafia ? activeChannel : "PUBLIC";
+
+  const filteredMessages = useMemo(() => {
+    return chatMessages.filter((msg) => {
+      if (msg.isSystem) return true;
+      if (effectiveChannel === "MAFIA") {
+        return msg.channel === "MAFIA";
+      }
+      return msg.channel === "PUBLIC" || !msg.channel;
+    });
+  }, [chatMessages, effectiveChannel]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    onSendChat(chatInput.trim(), effectiveChannel);
+    setChatInput("");
+  };
+
   return (
-    <div className={`bg-noir-900/90 backdrop-blur-md border border-noir-800 rounded-2xl flex flex-col ${heightClass} shadow-xl overflow-hidden pointer-events-auto`}>
-      <div className="p-3.5 border-b border-noir-800 bg-noir-950/60 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <MessageSquare className="w-4 h-4 text-emerald-400" />
-          <span className="font-bold text-xs uppercase tracking-wider text-white">
-            Town Log & Chat
+    <div className={`bg-noir-900/90 backdrop-blur-md border ${
+      effectiveChannel === "MAFIA" ? "border-blood-800/80 shadow-blood-950/40" : "border-noir-800"
+    } rounded-2xl flex flex-col ${heightClass} shadow-xl overflow-hidden pointer-events-auto transition-colors`}>
+      {/* Header and Channel Tabs */}
+      <div className="border-b border-noir-800 bg-noir-950/70 p-2.5">
+        <div className="flex items-center justify-between mb-2 px-1">
+          <div className="flex items-center space-x-2">
+            {effectiveChannel === "MAFIA" ? (
+              <Skull className="w-4 h-4 text-blood-400 animate-pulse" />
+            ) : (
+              <MessageSquare className="w-4 h-4 text-emerald-400" />
+            )}
+            <span className="font-bold text-xs uppercase tracking-wider text-white">
+              {effectiveChannel === "MAFIA" ? "Syndicate Channel" : "Town Hall Log"}
+            </span>
+          </div>
+          <span className="text-[10px] font-mono text-noir-400">
+            {isAlive || phase === Phase.VICTORY ? "Speech Enabled" : "Spectator Muted"}
           </span>
         </div>
-        <span className="text-[10px] font-mono text-noir-400">
-          {isAlive || phase === Phase.VICTORY ? "Speech Enabled" : "Spectator Muted"}
-        </span>
+
+        {/* Channel Tabs (Strictly visible to living Mafia members) */}
+        {isLivingMafia && (
+          <div className="flex space-x-1.5 bg-noir-900/80 p-1 rounded-xl border border-noir-800">
+            <button
+              type="button"
+              onClick={() => setActiveChannel("PUBLIC")}
+              className={`flex-1 py-1 px-2.5 rounded-lg text-xs font-mono font-bold transition flex items-center justify-center space-x-1.5 ${
+                effectiveChannel === "PUBLIC"
+                  ? "bg-emerald-600/20 text-emerald-400 border border-emerald-500/30"
+                  : "text-noir-400 hover:text-noir-200"
+              }`}
+            >
+              <MessageSquare className="w-3 h-3" />
+              <span>Town Chat</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveChannel("MAFIA")}
+              className={`flex-1 py-1 px-2.5 rounded-lg text-xs font-mono font-bold transition flex items-center justify-center space-x-1.5 ${
+                effectiveChannel === "MAFIA"
+                  ? "bg-blood-600/30 text-blood-400 border border-blood-500/40 shadow-sm"
+                  : "text-noir-400 hover:text-blood-300"
+              }`}
+            >
+              <Skull className="w-3 h-3" />
+              <span>Syndicate (Private)</span>
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* Message Feed */}
       <div className="flex-1 p-3.5 space-y-2.5 overflow-y-auto font-sans text-xs">
-        {chatMessages.length === 0 ? (
+        {filteredMessages.length === 0 ? (
           <div className="h-full flex items-center justify-center text-noir-500 text-center px-4">
-            No town announcements or chats yet.
+            {effectiveChannel === "MAFIA"
+              ? "No private Syndicate messages yet. Plot your moves here."
+              : "No town announcements or chats yet."}
           </div>
         ) : (
-          chatMessages.map((msg) => (
+          filteredMessages.map((msg) => (
             <div
               key={msg.id}
               className={`rounded-lg p-2.5 text-xs ${
                 msg.isSystem
                   ? "bg-noir-950 border border-noir-800 text-amber-300 font-mono"
+                  : msg.channel === "MAFIA"
+                  ? "bg-blood-950/40 border border-blood-900/60 text-blood-100"
                   : "bg-noir-800/60 text-noir-200"
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className={`font-bold font-mono text-[11px] ${
-                  msg.isSystem ? "text-amber-400" : "text-emerald-400"
+                <span className={`font-bold font-mono text-[11px] flex items-center space-x-1.5 ${
+                  msg.isSystem
+                    ? "text-amber-400"
+                    : msg.channel === "MAFIA"
+                    ? "text-blood-400"
+                    : "text-emerald-400"
                 }`}>
-                  {msg.senderName}
+                  {msg.channel === "MAFIA" && (
+                    <span className="px-1 py-0.5 rounded bg-blood-900/60 text-blood-300 border border-blood-700/50 text-[9px] font-mono font-bold">
+                      MAFIA
+                    </span>
+                  )}
+                  <span>{msg.senderName}</span>
                 </span>
                 <span className="text-[10px] text-noir-500 font-mono">
                   {new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
@@ -141,23 +222,34 @@ function ChatWidget({
         )}
       </div>
 
-      <form onSubmit={handleChatSubmit} className="p-2.5 border-t border-noir-800 bg-noir-950/80 flex space-x-2">
+      {/* Chat Input */}
+      <form onSubmit={handleSubmit} className="p-2.5 border-t border-noir-800 bg-noir-950/80 flex space-x-2">
         <input
           type="text"
           disabled={!isAlive && phase !== Phase.VICTORY}
           value={chatInput}
           onChange={(e) => setChatInput(e.target.value)}
           placeholder={
-            isAlive || phase === Phase.VICTORY
-              ? "Send message to town..."
-              : "Eliminated players cannot speak to living players"
+            !isAlive && phase !== Phase.VICTORY
+              ? "Eliminated players cannot speak to living players"
+              : effectiveChannel === "MAFIA"
+              ? "Send encrypted message to Syndicate..."
+              : "Send message to town..."
           }
-          className="flex-1 bg-noir-900 border border-noir-800 rounded-xl px-3 py-2 text-xs text-white placeholder-noir-500 focus:outline-none focus:border-emerald-500 transition disabled:opacity-50"
+          className={`flex-1 bg-noir-900 border rounded-xl px-3 py-2 text-xs text-white placeholder-noir-500 focus:outline-none transition disabled:opacity-50 ${
+            effectiveChannel === "MAFIA"
+              ? "border-blood-800 focus:border-blood-500"
+              : "border-noir-800 focus:border-emerald-500"
+          }`}
         />
         <button
           type="submit"
           disabled={(!isAlive && phase !== Phase.VICTORY) || !chatInput.trim()}
-          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white transition flex items-center justify-center"
+          className={`px-3.5 py-2 rounded-xl text-white transition flex items-center justify-center disabled:opacity-40 ${
+            effectiveChannel === "MAFIA"
+              ? "bg-blood-600 hover:bg-blood-500"
+              : "bg-emerald-600 hover:bg-emerald-500"
+          }`}
         >
           <Send className="w-3.5 h-3.5" />
         </button>
@@ -177,16 +269,79 @@ export function GameHUD({
   winningTeam,
   isHost,
   chatMessages,
+  myRole: propMyRole,
+  mafiaTeammates: propMafiaTeammates,
+  allRevealedRoles: propAllRevealedRoles,
   onSendChat,
   onReturnToLobby,
   onLeaveRoom
 }: GameHUDProps) {
   // --- Private Role State ---
-  const [myRole, setMyRole] = useState<Role | null>(null);
-  const [mafiaTeammates, setMafiaTeammates] = useState<Array<{ id: string; displayName: string }>>([]);
-  const [allRevealedRoles, setAllRevealedRoles] = useState<Record<string, { displayName: string; role: Role }> | null>(null);
+  const [myRole, setMyRole] = useState<Role | null>(propMyRole || null);
+  const [mafiaTeammates, setMafiaTeammates] = useState<Array<{ id: string; displayName: string }>>(propMafiaTeammates || []);
+  const [allRevealedRoles, setAllRevealedRoles] = useState<Record<string, { displayName: string; role: Role }> | null>(propAllRevealedRoles || null);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [roleRevealedInModal, setRoleRevealedInModal] = useState(false);
+  const roleDismissedByUserRef = useRef(false);
+
+  // Toggleable controls & viewport look guides in 3D mode
+  const [showWasdHelp, setShowWasdHelp] = useState(true);
+  const [showViewportHelp, setShowViewportHelp] = useState(true);
+
+  const handleDismissRoleModal = () => {
+    roleDismissedByUserRef.current = true;
+    setShowRoleModal(false);
+  };
+
+  // Sync role state from parent props
+  useEffect(() => {
+    if (propMyRole) {
+      setMyRole(propMyRole);
+      voiceChatService.setRoleContext(propMyRole, propMafiaTeammates?.map((t) => t.id) || []);
+      if (phase === Phase.ROLE_ASSIGNMENT && !roleDismissedByUserRef.current) {
+        setShowRoleModal(true);
+      }
+    }
+  }, [propMyRole, propMafiaTeammates, phase]);
+
+  useEffect(() => {
+    if (propMafiaTeammates && propMafiaTeammates.length > 0) {
+      setMafiaTeammates(propMafiaTeammates);
+    }
+  }, [propMafiaTeammates]);
+
+  useEffect(() => {
+    if (propAllRevealedRoles) {
+      setAllRevealedRoles(propAllRevealedRoles);
+    }
+  }, [propAllRevealedRoles]);
+
+  // Self-heal: If match is active and myRole is not yet set, request it immediately from server
+  useEffect(() => {
+    if (room && !myRole && phase !== Phase.WAITING_FOR_PLAYERS) {
+      room.send(ClientMessageType.GET_ROLE);
+    }
+  }, [room, myRole, phase]);
+
+  // Release pointer lock whenever modal opens so cursor is free to click
+  useEffect(() => {
+    if (showRoleModal) {
+      if (typeof document !== "undefined" && document.pointerLockElement) {
+        document.exitPointerLock();
+      }
+    }
+  }, [showRoleModal]);
+
+  // Support ESC key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && showRoleModal) {
+        handleDismissRoleModal();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showRoleModal]);
 
   // --- Voting & Targeting State ---
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
@@ -195,7 +350,6 @@ export function GameHUD({
   const [mafiaVoteCounts, setMafiaVoteCounts] = useState<Record<string, number>>({});
 
   // --- Chat & View Mode ---
-  const [chatInput, setChatInput] = useState("");
   const [viewMode, setViewMode] = useState<"3d" | "hud">("3d");
   const [isChatOpen, setIsChatOpen] = useState(true);
 
@@ -322,6 +476,7 @@ export function GameHUD({
     audioManager.playPhaseTransition(phase as Phase);
 
     if (phase === Phase.ROLE_ASSIGNMENT) {
+      roleDismissedByUserRef.current = false;
       setShowRoleModal(true);
       setRoleRevealedInModal(false);
     }
@@ -347,8 +502,13 @@ export function GameHUD({
           setMyRole(data.role);
           if (data.teammates) {
             setMafiaTeammates(data.teammates);
+            voiceChatService.setRoleContext(data.role, data.teammates.map((t) => t.id));
+          } else {
+            voiceChatService.setRoleContext(data.role, []);
           }
-          setShowRoleModal(true);
+          if (!roleDismissedByUserRef.current) {
+            setShowRoleModal(true);
+          }
         }
       }
     );
@@ -385,18 +545,11 @@ export function GameHUD({
   };
 
   const handleCastDayVote = (targetId: string) => {
-    if (!room || !isAlive || (phase !== Phase.DAY_VOTING && phase !== Phase.REVOTING)) return;
+    if (!room || !isAlive || (phase !== Phase.DAY_DISCUSSION && phase !== Phase.DAY_VOTING && phase !== Phase.REVOTING)) return;
     audioManager.playVoteConfirm();
     setSelectedTargetId(targetId);
     setHasVoted(true);
     room.send(ClientMessageType.CAST_VOTE, { targetId });
-  };
-
-  const handleChatSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-    onSendChat(chatInput.trim());
-    setChatInput("");
   };
 
   // Phase metadata badge
@@ -425,14 +578,14 @@ export function GameHUD({
         };
       case Phase.DAY_DISCUSSION:
         return {
-          title: "Town Assembly",
-          subtitle: "Discuss suspicious behaviors and formulate theories.",
+          title: "Town Discussion & Voting",
+          subtitle: `Discuss suspects and cast votes concurrently. Strict 50% majority required (≥ ${votesRequired} votes). Change your vote any time.`,
           color: "border-emerald-500/50 text-emerald-400 bg-emerald-500/10",
-          icon: <MessageSquare className="w-5 h-5 text-emerald-400" />
+          icon: <Crosshair className="w-5 h-5 text-emerald-400" />
         };
       case Phase.DAY_VOTING:
         return {
-          title: "Public Tribunal",
+          title: "Tribunal Voting",
           subtitle: `Eliminate a suspect. Strict 50% majority required (≥ ${votesRequired} votes).`,
           color: "border-red-500/50 text-red-400 bg-red-500/10",
           icon: <Crosshair className="w-5 h-5 text-red-400" />
@@ -564,7 +717,7 @@ export function GameHUD({
             {myRole && (
               <button
                 onClick={() => setShowRoleModal(true)}
-                className={`hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border transition ${
+                className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border transition ${
                   myRole === Role.MAFIA
                     ? "bg-blood-600/20 border-blood-500/50 text-blood-400 hover:bg-blood-600/30"
                     : "bg-emerald-500/20 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/30"
@@ -666,38 +819,144 @@ export function GameHUD({
         </div>
       </div>
 
-      {/* 2. CONTROLS BANNER & CHAT TOGGLE IN 3D MODE */}
+      {/* 1.5 PERSISTENT PROMINENT ROLE INDICATOR BANNER (ALL VIEWPORTS & VIEWS) */}
+      {myRole && (
+        <div className="fixed top-14 sm:top-16 left-1/2 -translate-x-1/2 z-35 pointer-events-none flex justify-center">
+          <div
+            className={`py-1.5 px-3.5 sm:px-5 rounded-full border backdrop-blur-md shadow-2xl flex items-center justify-between sm:justify-center space-x-2 sm:space-x-4 pointer-events-auto transition-all ${
+              myRole === Role.MAFIA
+                ? "bg-blood-950/95 border-blood-500/70 text-white shadow-blood-950/70 ring-1 ring-blood-500/40"
+                : "bg-emerald-950/95 border-emerald-500/70 text-white shadow-emerald-950/70 ring-1 ring-emerald-500/40"
+            }`}
+          >
+            <div className="flex items-center space-x-2 shrink-0">
+              <div
+                className={`p-1 rounded-full ${
+                  myRole === Role.MAFIA ? "bg-blood-600 text-white" : "bg-emerald-600 text-white"
+                }`}
+              >
+                {myRole === Role.MAFIA ? (
+                  <Skull className="w-3.5 h-3.5" />
+                ) : (
+                  <Shield className="w-3.5 h-3.5" />
+                )}
+              </div>
+              <span className="font-black text-xs sm:text-sm tracking-wider uppercase">
+                YOU ARE {myRole}
+              </span>
+            </div>
+
+            {myRole === Role.MAFIA && (
+              <div className="text-[11px] font-mono text-blood-300 truncate max-w-[180px] sm:max-w-none">
+                <span className="text-blood-400 font-semibold">Syndicate:</span>{" "}
+                {mafiaTeammates.filter((m) => m.id !== sessionId).length > 0
+                  ? mafiaTeammates
+                      .filter((m) => m.id !== sessionId)
+                      .map((m) => m.displayName)
+                      .join(", ")
+                  : "Solo Operative"}
+              </div>
+            )}
+
+            {myRole === Role.CITIZEN && (
+              <span className="text-[11px] font-mono text-emerald-300 hidden md:inline">
+                Protect Town • Eliminate Syndicate
+              </span>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                roleDismissedByUserRef.current = false;
+                setShowRoleModal(true);
+              }}
+              className="text-[10px] font-mono text-noir-400 hover:text-white underline shrink-0 transition cursor-pointer"
+              title="Open Role Dossier"
+            >
+              Dossier
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2. CONTROLS, VIEWPORT GUIDE & CHAT TOGGLE IN 3D MODE */}
       {viewMode === "3d" && (
-        <div className="fixed top-16 left-4 right-4 z-30 flex items-center justify-between pointer-events-none">
-          <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-noir-950/80 backdrop-blur-md border border-noir-800/80 text-noir-300 text-[11px] font-mono pointer-events-auto shadow-md">
-            <Compass className="w-3.5 h-3.5 text-blue-400" />
-            <span className="text-white font-bold">WASD:</span>
-            <span>Move</span>
-            <span className="text-noir-600">•</span>
-            <span className="text-amber-400 font-bold">Shift:</span>
-            <span>Sprint</span>
-            <span className="text-noir-600">•</span>
-            <span className="text-emerald-400 font-bold">Space:</span>
-            <span>Jump</span>
-            <span className="text-noir-600">•</span>
-            <span className="text-blue-400 font-bold">Mouse:</span>
-            <span>Look</span>
-            <span className="text-noir-600">•</span>
-            <span className="text-rose-400 font-bold">ESC:</span>
-            <span>Release</span>
+        <div className="fixed top-14 sm:top-16 left-4 right-4 z-30 flex items-center justify-between pointer-events-none gap-2">
+          {/* Left: Independent, Toggleable Guides (WASD & Viewport Look) */}
+          <div className="flex items-center space-x-2 pointer-events-auto flex-wrap gap-y-1.5">
+            {/* WASD Controls Guide */}
+            {showWasdHelp ? (
+              <div className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 rounded-full bg-noir-950/85 backdrop-blur-md border border-noir-800 text-noir-300 text-[11px] font-mono shadow-md animate-in fade-in zoom-in-95 duration-150">
+                <Compass className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span className="text-white font-bold">WASD:</span>
+                <span>Move</span>
+                <span className="text-noir-600">•</span>
+                <span className="text-amber-400 font-bold">Shift:</span>
+                <span>Sprint</span>
+                <span className="text-noir-600">•</span>
+                <span className="text-emerald-400 font-bold">Space:</span>
+                <span>Jump</span>
+                <button
+                  type="button"
+                  onClick={() => setShowWasdHelp(false)}
+                  className="ml-1 p-0.5 rounded-full hover:bg-noir-800 text-noir-400 hover:text-white transition cursor-pointer"
+                  title="Close WASD controls guide"
+                  aria-label="Close WASD controls guide"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowWasdHelp(true)}
+                className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-full bg-noir-950/85 backdrop-blur-md border border-noir-800 text-noir-300 hover:text-white text-[11px] font-mono shadow-md transition hover:border-noir-700 cursor-pointer animate-in fade-in duration-150"
+                title="Click to show WASD movement controls"
+                aria-label="Click to show WASD movement controls"
+              >
+                <Compass className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span className="font-bold">WASD</span>
+              </button>
+            )}
+
+            {/* Viewport Look Guide */}
+            {showViewportHelp ? (
+              <div className="hidden lg:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-noir-950/85 backdrop-blur-md border border-noir-800 text-[11px] font-mono text-noir-300 shadow-md animate-in fade-in zoom-in-95 duration-150">
+                <MousePointer className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="text-amber-400 font-bold">Click viewport:</span>
+                <span>Look</span>
+                <span className="text-noir-600">•</span>
+                <span className="text-rose-400 font-bold">ESC:</span>
+                <span>Release</span>
+                <button
+                  type="button"
+                  onClick={() => setShowViewportHelp(false)}
+                  className="ml-1 p-0.5 rounded-full hover:bg-noir-800 text-noir-400 hover:text-white transition cursor-pointer"
+                  title="Close viewport look guide"
+                  aria-label="Close viewport look guide"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowViewportHelp(true)}
+                className="hidden lg:inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-full bg-noir-950/85 backdrop-blur-md border border-noir-800 text-noir-300 hover:text-white text-[11px] font-mono shadow-md transition hover:border-noir-700 cursor-pointer animate-in fade-in duration-150"
+                title="Click to show mouse look guide"
+                aria-label="Click to show mouse look guide"
+              >
+                <MousePointer className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>Mouse Look</span>
+              </button>
+            )}
           </div>
 
-          <div className="hidden md:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-noir-950/80 backdrop-blur-md border border-noir-800/80 text-[11px] font-mono text-noir-300 pointer-events-auto shadow-md">
-            <span className="text-amber-400 font-bold">Click viewport</span>
-            <span>to look around</span>
-            <span className="text-noir-600">•</span>
-            <span className="text-white font-bold">ESC</span>
-            <span>to release mouse</span>
-          </div>
-
+          {/* Right: Chat Toggle */}
           <button
+            type="button"
             onClick={() => setIsChatOpen(!isChatOpen)}
-            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-noir-950/80 backdrop-blur-md border border-noir-800/80 text-noir-300 hover:text-white text-[11px] font-mono pointer-events-auto transition shadow-md"
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-noir-950/85 backdrop-blur-md border border-noir-800 text-noir-300 hover:text-white text-[11px] font-mono pointer-events-auto transition shadow-md shrink-0 cursor-pointer"
           >
             <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
             <span>{isChatOpen ? "Hide Chat" : "Show Chat"}</span>
@@ -753,9 +1012,13 @@ export function GameHUD({
                         Select a citizen to assassinate. Strict PLURALITY decides the victim; tied votes result in NO kill.
                       </p>
                     </div>
-                    {mafiaTeammates.length > 1 && (
+                    {mafiaTeammates.filter((m) => m.id !== sessionId).length > 0 ? (
                       <div className="text-xs font-mono bg-blood-950/40 border border-blood-800/40 px-3 py-1 rounded-lg text-blood-300">
-                        Teammates: {mafiaTeammates.map((m) => m.displayName).join(", ")}
+                        Teammates: {mafiaTeammates.filter((m) => m.id !== sessionId).map((m) => m.displayName).join(", ")}
+                      </div>
+                    ) : (
+                      <div className="text-xs font-mono bg-blood-950/40 border border-blood-800/40 px-3 py-1 rounded-lg text-blood-300">
+                        Solo Syndicate Operative
                       </div>
                     )}
                   </div>
@@ -846,74 +1109,27 @@ export function GameHUD({
             </div>
           )}
 
-          {/* Phase 4: DAY DISCUSSION */}
-          {phase === Phase.DAY_DISCUSSION && (
+          {/* Phase 4 & 5: UNIFIED DAY DISCUSSION & TRIBUNAL VOTING */}
+          {(phase === Phase.DAY_DISCUSSION || phase === Phase.DAY_VOTING || phase === Phase.REVOTING) && (
             <div className="bg-noir-900 border border-noir-800 rounded-2xl p-6 space-y-6 shadow-xl">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-noir-800 pb-4">
                 <div>
                   <h3 className="text-lg font-black text-white flex items-center space-x-2">
-                    <MessageSquare className="w-5 h-5 text-emerald-400" />
-                    <span>Town Discussion Phase</span>
-                  </h3>
-                  <p className="text-xs text-noir-400 mt-0.5">
-                    Question suspects, analyze night outcomes, and coordinate before public voting begins.
-                  </p>
-                </div>
-              </div>
-
-              {/* Player Roster Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {players.map((p) => (
-                  <div
-                    key={p.id}
-                    className={`p-3.5 rounded-xl border flex items-center space-x-3 ${
-                      p.isAlive
-                        ? "bg-noir-950/60 border-noir-800"
-                        : "bg-noir-950/30 border-noir-800/40 opacity-50"
-                    }`}
-                  >
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-sm ${
-                      p.isAlive ? "bg-noir-800 text-noir-200" : "bg-noir-900 text-noir-500"
-                    }`}>
-                      {p.isAlive ? p.displayName.charAt(0).toUpperCase() : <Skull className="w-4 h-4 text-noir-500" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-white truncate flex items-center space-x-1.5">
-                        <span>{p.displayName}</span>
-                        {p.id === sessionId && (
-                          <span className="text-[10px] text-noir-400 font-mono">(You)</span>
-                        )}
-                        {(voiceChatService.isPeerSpeaking(p.id) || (p.id === sessionId && isSpeaking && !isMicMuted)) && (
-                          <Mic className="w-3 h-3 text-emerald-400 animate-pulse ml-1" />
-                        )}
-                      </div>
-                      <div className="text-xs font-mono">
-                        {p.isAlive ? (
-                          <span className="text-emerald-400">Alive</span>
-                        ) : (
-                          <span className="text-noir-500">Eliminated</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Phase 5 & 6: DAY VOTING & RUNOFF REVOTING */}
-          {(phase === Phase.DAY_VOTING || phase === Phase.REVOTING) && (
-            <div className="bg-noir-900 border border-noir-800 rounded-2xl p-6 space-y-6 shadow-xl">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-noir-800 pb-4">
-                <div>
-                  <h3 className="text-lg font-black text-white flex items-center space-x-2">
-                    <Crosshair className="w-5 h-5 text-red-500" />
-                    <span>{phase === Phase.REVOTING ? "Runoff Vote" : "Secret Ballot Voting"}</span>
+                    {phase === Phase.REVOTING ? (
+                      <AlertOctagon className="w-5 h-5 text-orange-400" />
+                    ) : (
+                      <Crosshair className="w-5 h-5 text-emerald-400" />
+                    )}
+                    <span>
+                      {phase === Phase.REVOTING
+                        ? "Runoff Revote Tribunal"
+                        : "Town Discussion & Tribunal Voting"}
+                    </span>
                   </h3>
                   <p className="text-xs text-noir-400 mt-0.5">
                     {phase === Phase.REVOTING
-                      ? "Vote for one of the tied runoff candidates."
-                      : "Votes are confidential until tallied. Mandatory ≥ 50% majority required to eliminate."}
+                      ? "Tie detected! Vote between tied runoff candidates."
+                      : "Discuss theories and cast your vote concurrently. You can change your vote freely until the day timer expires."}
                   </p>
                 </div>
 
@@ -925,72 +1141,83 @@ export function GameHUD({
                 </div>
               </div>
 
+              {/* Voting Candidates Grid */}
               {isAlive ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {livingPlayers.map((target) => {
-                    const isSelf = target.id === sessionId;
-                    const isSelected = selectedTargetId === target.id;
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {livingPlayers.map((target) => {
+                      const isSelf = target.id === sessionId;
+                      const isSelected = selectedTargetId === target.id;
 
-                    return (
-                      <button
-                        key={target.id}
-                        disabled={isSelf}
-                        onClick={() => handleCastDayVote(target.id)}
-                        className={`flex items-center justify-between p-4 rounded-xl border text-left transition-all ${
-                          isSelected
-                            ? "bg-red-950/40 border-red-500 text-white shadow-lg shadow-red-950/40"
-                            : isSelf
-                            ? "bg-noir-950/20 border-noir-800/40 opacity-40 cursor-not-allowed"
-                            : "bg-noir-950/60 border-noir-800 hover:border-noir-700 text-noir-200"
-                        }`}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-sm ${
-                            isSelected ? "bg-red-600 text-white" : "bg-noir-800 text-noir-300"
-                          }`}>
-                            {target.displayName.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="font-bold text-sm flex items-center space-x-1.5">
-                              <span>{target.displayName}</span>
-                              {isSelf && <span className="text-[10px] text-noir-400">(Self)</span>}
-                              {(voiceChatService.isPeerSpeaking(target.id) || (target.id === sessionId && isSpeaking && !isMicMuted)) && (
-                                <Mic className="w-3 h-3 text-emerald-400 animate-pulse ml-1" />
-                              )}
+                      return (
+                        <button
+                          key={target.id}
+                          disabled={isSelf}
+                          onClick={() => handleCastDayVote(target.id)}
+                          className={`flex items-center justify-between p-4 rounded-xl border text-left transition-all ${
+                            isSelected
+                              ? "bg-red-950/40 border-red-500 text-white shadow-lg shadow-red-950/40 ring-1 ring-red-500/50"
+                              : isSelf
+                              ? "bg-noir-950/20 border-noir-800/40 opacity-40 cursor-not-allowed"
+                              : "bg-noir-950/60 border-noir-800 hover:border-noir-700 text-noir-200"
+                          }`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-sm ${
+                              isSelected ? "bg-red-600 text-white" : "bg-noir-800 text-noir-300"
+                            }`}>
+                              {target.displayName.charAt(0).toUpperCase()}
                             </div>
-                            <div className="text-[11px] text-noir-400">
-                              {isSelf ? "Self-voting disabled" : "Click to eliminate"}
+                            <div>
+                              <div className="font-bold text-sm flex items-center space-x-1.5">
+                                <span>{target.displayName}</span>
+                                {isSelf && <span className="text-[10px] text-noir-400 font-mono">(Self)</span>}
+                                {(voiceChatService.isPeerSpeaking(target.id) || (target.id === sessionId && isSpeaking && !isMicMuted)) && (
+                                  <Mic className="w-3 h-3 text-emerald-400 animate-pulse ml-1" />
+                                )}
+                              </div>
+                              <div className="text-[11px] text-noir-400 font-mono">
+                                {isSelf
+                                  ? "Self-voting disabled"
+                                  : isSelected
+                                  ? "Vote active (click another to change)"
+                                  : "Click to cast suspect vote"}
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="flex items-center">
-                          {isSelected ? (
-                            <span className="font-mono text-xs px-2.5 py-1 rounded-lg bg-red-600 text-white font-bold flex items-center space-x-1">
-                              <Check className="w-3.5 h-3.5" />
-                              <span>Voted</span>
-                            </span>
-                          ) : (
-                            <Crosshair className="w-4 h-4 text-noir-600" />
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
+                          <div className="flex items-center">
+                            {isSelected ? (
+                              <span className="font-mono text-xs px-2.5 py-1 rounded-lg bg-red-600 text-white font-bold flex items-center space-x-1 shadow-sm">
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Voted</span>
+                              </span>
+                            ) : (
+                              <Crosshair className="w-4 h-4 text-noir-600" />
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {hasVoted && selectedTargetId && (
+                    <div className="flex items-center space-x-2 text-xs font-mono text-emerald-400 bg-emerald-950/30 border border-emerald-800/30 p-3 rounded-xl">
+                      <Check className="w-4 h-4" />
+                      <span>
+                        Your vote is currently locked on{" "}
+                        <strong className="text-white">
+                          {players.find((p) => p.id === selectedTargetId)?.displayName}
+                        </strong>
+                        . You can freely change your vote anytime before the countdown expires.
+                      </span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="py-8 text-center text-noir-400 text-sm">
                   <Ghost className="w-8 h-8 text-noir-500 mx-auto mb-2" />
                   You are eliminated and cannot cast votes.
-                </div>
-              )}
-
-              {hasVoted && (
-                <div className="flex items-center space-x-2 text-xs font-mono text-emerald-400 bg-emerald-950/30 border border-emerald-800/30 p-3 rounded-xl">
-                  <Check className="w-4 h-4" />
-                  <span>
-                    Your vote has been cast. The council will announce results once the voting timer expires.
-                  </span>
                 </div>
               )}
             </div>
@@ -1110,10 +1337,9 @@ export function GameHUD({
           <ChatWidget
             isAlive={isAlive}
             phase={phase}
+            myRole={myRole}
             chatMessages={chatMessages}
-            chatInput={chatInput}
-            setChatInput={setChatInput}
-            handleChatSubmit={handleChatSubmit}
+            onSendChat={onSendChat}
             heightClass="h-[560px]"
           />
         </div>
@@ -1125,17 +1351,16 @@ export function GameHUD({
           <ChatWidget
             isAlive={isAlive}
             phase={phase}
+            myRole={myRole}
             chatMessages={chatMessages}
-            chatInput={chatInput}
-            setChatInput={setChatInput}
-            handleChatSubmit={handleChatSubmit}
+            onSendChat={onSendChat}
             heightClass="h-[360px]"
           />
         </div>
       )}
 
       {/* Floating 3D Mode Day Voting Panel */}
-      {viewMode === "3d" && (phase === Phase.DAY_VOTING || phase === Phase.REVOTING) && (
+      {viewMode === "3d" && (phase === Phase.DAY_DISCUSSION || phase === Phase.DAY_VOTING || phase === Phase.REVOTING) && (
         <div className="fixed bottom-6 left-6 z-30 max-w-md w-full bg-noir-900/90 backdrop-blur-md border border-noir-800 rounded-2xl p-4 shadow-2xl pointer-events-auto space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -1222,10 +1447,37 @@ export function GameHUD({
         </div>
       )}
 
+      </div>
+
       {/* 3. SECRET ROLE DOSSIER MODAL */}
       {showRoleModal && myRole && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-noir-900 border border-noir-800 rounded-3xl p-6 shadow-2xl text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
+        <div
+          data-no-pointer-lock
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              handleDismissRoleModal();
+            }
+          }}
+          className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 pointer-events-auto select-none"
+        >
+          <div
+            data-no-pointer-lock
+            className="relative max-w-md w-full bg-noir-900 border border-noir-800 rounded-3xl p-6 shadow-2xl text-center space-y-6 animate-in fade-in zoom-in-95 duration-200 pointer-events-auto"
+          >
+            {/* Top-right X button */}
+            <button
+              type="button"
+              data-no-pointer-lock
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDismissRoleModal();
+              }}
+              className="absolute top-4 right-4 p-2 rounded-xl text-noir-400 hover:text-white hover:bg-noir-800 transition pointer-events-auto cursor-pointer"
+              aria-label="Close dossier"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
             <div className="space-y-1">
               <span className="text-xs font-mono uppercase tracking-widest text-noir-400">Classified Dossier</span>
               <h3 className="text-xl font-bold text-white tracking-wide">Identity Assignment</h3>
@@ -1261,34 +1513,45 @@ export function GameHUD({
               </p>
 
               {/* Mafia Teammates list */}
-              {myRole === Role.MAFIA && mafiaTeammates.length > 0 && (
+              {myRole === Role.MAFIA && (
                 <div className="mt-5 pt-4 border-t border-blood-900/50 text-left">
                   <div className="text-[11px] font-mono uppercase tracking-wider text-blood-300 mb-2">
                     Syndicate Teammates:
                   </div>
-                  <div className="space-y-1">
-                    {mafiaTeammates.map((teammate) => (
-                      <div key={teammate.id} className="text-xs text-white font-mono flex items-center space-x-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blood-500"></span>
-                        <span>{teammate.displayName}</span>
-                        {teammate.id === sessionId && <span className="text-noir-500">(You)</span>}
-                      </div>
-                    ))}
-                  </div>
+                  {mafiaTeammates.filter((m) => m.id !== sessionId).length > 0 ? (
+                    <div className="space-y-1">
+                      {mafiaTeammates
+                        .filter((m) => m.id !== sessionId)
+                        .map((teammate) => (
+                          <div key={teammate.id} className="text-xs text-white font-mono flex items-center space-x-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blood-500"></span>
+                            <span>{teammate.displayName}</span>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-noir-300 italic font-mono">
+                      You are the lone Syndicate operative in town. Blend in with the Citizens!
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
             <button
-              onClick={() => setShowRoleModal(false)}
-              className="w-full py-3 rounded-xl bg-noir-800 hover:bg-noir-700 text-white font-bold text-sm tracking-wide transition border border-noir-700"
+              type="button"
+              data-no-pointer-lock
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDismissRoleModal();
+              }}
+              className="w-full py-3 rounded-xl bg-noir-800 hover:bg-noir-700 active:bg-noir-600 text-white font-bold text-sm tracking-wide transition border border-noir-700 pointer-events-auto cursor-pointer shadow-lg"
             >
               Acknowledge & Close
             </button>
           </div>
         </div>
       )}
-      </div>
     </div>
   );
 }

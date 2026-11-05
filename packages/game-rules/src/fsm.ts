@@ -8,7 +8,12 @@ const VALID_TRANSITIONS: Record<Phase, Phase[]> = {
   [Phase.ROLE_ASSIGNMENT]: [Phase.NIGHT],
   [Phase.NIGHT]: [Phase.MORNING_ANNOUNCEMENT],
   [Phase.MORNING_ANNOUNCEMENT]: [Phase.DAY_DISCUSSION, Phase.VICTORY],
-  [Phase.DAY_DISCUSSION]: [Phase.DAY_VOTING],
+  [Phase.DAY_DISCUSSION]: [
+    Phase.ELIMINATION_ANNOUNCEMENT, // Someone reached >= 50% in unified day vote
+    Phase.REVOTING,                 // Tied top candidates
+    Phase.NIGHT,                    // Leading candidate < 50%
+    Phase.DAY_VOTING                // Legacy transition
+  ],
   [Phase.DAY_VOTING]: [
     Phase.ELIMINATION_ANNOUNCEMENT, // Someone reached >= 50%
     Phase.REVOTING,                 // Highest votes tied

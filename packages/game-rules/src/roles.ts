@@ -40,7 +40,29 @@ export function validateMafiaPercentage(percentage: number): void {
 }
 
 /**
+ * Validates an exact Mafia count constraint.
+ * Requirements:
+ *  - Integer >= 1
+ *  - At least 1 Citizen remaining (mafiaCount < totalPlayers)
+ *  - Mafia cannot exceed standard game balance ceiling (up to 40% of room).
+ */
+export function validateExactMafiaCount(totalPlayers: number, mafiaCount: number, isDevMode = false): void {
+  validatePlayerCount(totalPlayers, isDevMode);
+  if (!Number.isInteger(mafiaCount) || mafiaCount < 1) {
+    throw new Error(`Invalid Mafia count: ${mafiaCount}. Must be an integer >= 1.`);
+  }
+  if (mafiaCount >= totalPlayers) {
+    throw new Error(`Invalid Mafia count: ${mafiaCount}. At least one Citizen must remain.`);
+  }
+  const maxAllowed = Math.max(1, Math.floor(totalPlayers * 0.45));
+  if (mafiaCount > maxAllowed) {
+    throw new Error(`Mafia count ${mafiaCount} exceeds maximum game balance limit (${maxAllowed} for ${totalPlayers} players).`);
+  }
+}
+
+/**
  * Calculates authoritative Mafia and Citizen counts.
+ * Supports either exact count (if provided) or percentage-based calculation.
  * Formula: floor(totalPlayers * mafiaPercentage / 100)
  * Constraints:
  *  - At least 1 Mafia.
@@ -50,9 +72,19 @@ export function validateMafiaPercentage(percentage: number): void {
 export function calculateRoleCounts(
   totalPlayers: number,
   mafiaPercentage: number = DEFAULT_MAFIA_PERCENT,
-  isDevMode = false
+  isDevMode = false,
+  exactMafiaCount?: number
 ): RoleCountResult {
   validatePlayerCount(totalPlayers, isDevMode);
+
+  if (typeof exactMafiaCount === "number" && exactMafiaCount > 0) {
+    validateExactMafiaCount(totalPlayers, exactMafiaCount, isDevMode);
+    return {
+      mafiaCount: exactMafiaCount,
+      citizenCount: totalPlayers - exactMafiaCount
+    };
+  }
+
   validateMafiaPercentage(mafiaPercentage);
 
   const rawMafia = Math.floor((totalPlayers * mafiaPercentage) / 100);
@@ -79,6 +111,59 @@ export function calculateRoleCounts(
 }
 
 /**
+ * Validates manual host-controlled Mafia assignments.
+ */
+export function validateManualMafiaAssignment(
+  playerIds: string[],
+  selectedMafiaIds: string[],
+  expectedMafiaCount: number
+): void {
+  if (!Array.isArray(selectedMafiaIds)) {
+    throw new Error("Selected Mafia players must be an array of player IDs.");
+  }
+  if (selectedMafiaIds.length !== expectedMafiaCount) {
+    throw new Error(
+      `Manual assignment mismatch: selected ${selectedMafiaIds.length} Mafia, expected exactly ${expectedMafiaCount}.`
+    );
+  }
+  const uniqueSelected = new Set(selectedMafiaIds);
+  if (uniqueSelected.size !== selectedMafiaIds.length) {
+    throw new Error("Duplicate players found in manual Mafia assignment.");
+  }
+  const playerSet = new Set(playerIds);
+  for (const id of selectedMafiaIds) {
+    if (!playerSet.has(id)) {
+      throw new Error(`Selected Mafia player ID "${id}" is not connected to the room.`);
+    }
+  }
+  if (selectedMafiaIds.length >= playerIds.length) {
+    throw new Error("Manual assignment must leave at least one Citizen.");
+  }
+}
+
+/**
+ * Assigns roles manually based on host selection.
+ * Remaining players automatically become Citizens.
+ */
+export function distributeRolesManual(
+  playerIds: string[],
+  selectedMafiaIds: string[],
+  expectedMafiaCount: number
+): Map<string, Role> {
+  validateManualMafiaAssignment(playerIds, selectedMafiaIds, expectedMafiaCount);
+  const mafiaSet = new Set(selectedMafiaIds);
+  const roleMap = new Map<string, Role>();
+  for (const id of playerIds) {
+    if (mafiaSet.has(id)) {
+      roleMap.set(id, Role.MAFIA);
+    } else {
+      roleMap.set(id, Role.CITIZEN);
+    }
+  }
+  return roleMap;
+}
+
+/**
  * Cryptographically secure Fisher-Yates array shuffle.
  * Uses global crypto API (supported in Node.js >= 19 and modern browsers).
  */
@@ -102,10 +187,11 @@ export function secureShuffle<T>(array: T[]): T[] {
 export function distributeRoles(
   playerIds: string[],
   mafiaPercentage: number = DEFAULT_MAFIA_PERCENT,
-  isDevMode = false
+  isDevMode = false,
+  exactMafiaCount?: number
 ): Map<string, Role> {
   const total = playerIds.length;
-  const { mafiaCount, citizenCount } = calculateRoleCounts(total, mafiaPercentage, isDevMode);
+  const { mafiaCount, citizenCount } = calculateRoleCounts(total, mafiaPercentage, isDevMode, exactMafiaCount);
 
   // Prepare role pool
   const rolePool: Role[] = [

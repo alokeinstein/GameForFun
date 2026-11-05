@@ -186,6 +186,7 @@ export function ShootingCombatVFX({ room, localSessionId }: ShootingCombatVFXPro
             key={dmg.id}
             position={[dmg.position.x, dmg.position.y + yOffset, dmg.position.z]}
             center
+            zIndexRange={[100, 0]}
             style={{ pointerEvents: "none" }}
           >
             <div

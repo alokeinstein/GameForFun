@@ -139,10 +139,13 @@ export function CharacterController({ room, player, isHost = false }: CharacterC
 
     const handlePointerLockChange = () => {
       isPointerLocked.current = document.pointerLockElement !== null;
+      if (isPointerLocked.current && document.querySelector("[data-no-pointer-lock]")) {
+        document.exitPointerLock();
+      }
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isPointerLocked.current) return;
+      if (!isPointerLocked.current || document.querySelector("[data-no-pointer-lock]")) return;
 
       const sensitivity = 0.0025;
       // Moving mouse left/right rotates yaw (horizontal orbit)
@@ -163,6 +166,7 @@ export function CharacterController({ room, player, isHost = false }: CharacterC
     };
 
     const handleWheel = (e: WheelEvent) => {
+      if (document.querySelector("[data-no-pointer-lock]")) return;
       // Zoom camera in/out with scroll wheel
       cameraDistance.current = THREE.MathUtils.clamp(
         cameraDistance.current + e.deltaY * 0.005,
@@ -172,8 +176,12 @@ export function CharacterController({ room, player, isHost = false }: CharacterC
     };
 
     const handleCanvasClick = (e: MouseEvent) => {
+      // Don't request pointer lock if a modal is visible or if clicking on interactive UI elements or chat
+      if (document.querySelector("[data-no-pointer-lock]")) {
+        return;
+      }
+
       const target = e.target as HTMLElement;
-      // Don't request pointer lock if clicking on interactive UI elements or chat
       if (
         target.tagName === "BUTTON" ||
         target.tagName === "INPUT" ||

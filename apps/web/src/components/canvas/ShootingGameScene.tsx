@@ -30,7 +30,7 @@ export function ShootingGameScene({
   const isSpectator = !localPlayer || !localPlayer.isAlive;
 
   return (
-    <div className="absolute inset-0 w-full h-full overflow-hidden bg-noir-950 pointer-events-auto">
+    <div className="absolute inset-0 w-full h-full overflow-hidden bg-sky-200 pointer-events-auto">
       <Canvas
         shadows
         dpr={[1, 1.5]}

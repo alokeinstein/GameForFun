@@ -35,7 +35,8 @@ import {
   ShootingTeamState,
   ChatMessagePayload
 } from "@mafia/shared";
-import { calculateRoleCounts } from "@mafia/game-rules";
+import { calculateRoleCounts, AssignmentMethod, Role } from "@mafia/game-rules";
+import { voiceChatService } from "../../../services/webrtc";
 import {
   joinOrCreateMafiaRoom,
   joinOrCreateShootingRoom,
@@ -56,6 +57,7 @@ interface ChatItem {
   message: string;
   isSystem?: boolean;
   timestamp: number;
+  channel?: "PUBLIC" | "MAFIA" | "DEAD";
 }
 
 export default function LobbyPage() {
@@ -80,12 +82,21 @@ export default function LobbyPage() {
   const [mafiaWinningTeam, setMafiaWinningTeam] = useState("");
   const [mafiaConfig, setMafiaConfig] = useState({
     mafiaPercentage: 20,
+    mafiaCount: 0,
+    assignmentMethod: AssignmentMethod.RANDOM as AssignmentMethod,
     nightDurationSec: 30,
+    dayDurationSec: 120,
     discussionDurationSec: 120,
     votingDurationSec: 30,
     revealRoleOnDeath: true,
     isDevMode: false
   });
+  const [manualMafiaPlayerIds, setManualMafiaPlayerIds] = useState<string[]>([]);
+  const [myRole, setMyRole] = useState<Role | null>(null);
+  const myRoleRef = useRef<Role | null>(null);
+  const roleRequestedRef = useRef(false);
+  const [mafiaTeammates, setMafiaTeammates] = useState<Array<{ id: string; displayName: string }>>([]);
+  const [allRevealedRoles, setAllRevealedRoles] = useState<Record<string, { displayName: string; role: Role }> | null>(null);
 
   // Shooting Room State
   const [shootingRoom, setShootingRoom] = useState<Room<ShootingRoomState> | null>(null);
@@ -199,19 +210,62 @@ export default function LobbyPage() {
           if (state.config) {
             setMafiaConfig({
               mafiaPercentage: state.config.mafiaPercentage,
+              mafiaCount: state.config.mafiaCount || 0,
+              assignmentMethod: (state.config.assignmentMethod || AssignmentMethod.RANDOM) as AssignmentMethod,
               nightDurationSec: state.config.nightDurationSec,
+              dayDurationSec: state.config.dayDurationSec || state.config.discussionDurationSec || 120,
               discussionDurationSec: state.config.discussionDurationSec,
               votingDurationSec: state.config.votingDurationSec,
               revealRoleOnDeath: state.config.revealRoleOnDeath,
               isDevMode: state.config.isDevMode
             });
           }
+
+          // If match is active and role not received yet, request role from server ONCE
+          if (state.phase !== "WAITING_FOR_PLAYERS") {
+            if (!myRoleRef.current && !roleRequestedRef.current) {
+              roleRequestedRef.current = true;
+              r.send(ClientMessageType.GET_ROLE);
+            }
+          } else {
+            myRoleRef.current = null;
+            roleRequestedRef.current = false;
+          }
         };
 
         r.onStateChange(updateMafiaState);
 
+        // Authoritative Role Assignment Handler (Active as soon as room is joined)
+        r.onMessage(
+          ServerMessageType.ROLE_ASSIGNMENT,
+          (data: {
+            role?: Role;
+            teammates?: Array<{ id: string; displayName: string }>;
+            isGameOverReveal?: boolean;
+            allRoles?: Record<string, { displayName: string; role: Role }>;
+            winningTeam?: string;
+          }) => {
+            if (data.isGameOverReveal && data.allRoles) {
+              setAllRevealedRoles(data.allRoles);
+            } else if (data.role) {
+              myRoleRef.current = data.role;
+              setMyRole(data.role);
+              if (data.teammates) {
+                setMafiaTeammates(data.teammates);
+                voiceChatService.setRoleContext(data.role, data.teammates.map((t) => t.id));
+              } else {
+                voiceChatService.setRoleContext(data.role, []);
+              }
+            }
+          }
+        );
+
         r.onMessage(ServerMessageType.RECONNECTION_TOKEN, (data: { token: string }) => {
           saveReconnectionToken(roomCode, data.token);
+        });
+
+        r.onMessage(ServerMessageType.MANUAL_MAFIA_CONFIRMED, (data: { mafiaPlayerIds: string[] }) => {
+          setManualMafiaPlayerIds(data.mafiaPlayerIds || []);
         });
 
         r.onMessage(ServerMessageType.SYSTEM_NOTIFICATION, (data: { message: string }) => {
@@ -224,7 +278,13 @@ export default function LobbyPage() {
         r.onMessage(ServerMessageType.CHAT_MESSAGE, (data: ChatMessagePayload) => {
           setChatMessages((prev) => [
             ...prev,
-            { id: Math.random().toString(), senderName: data.senderName, message: data.message, timestamp: data.timestamp }
+            {
+              id: Math.random().toString(),
+              senderName: data.senderName,
+              message: data.message,
+              channel: data.channel || "PUBLIC",
+              timestamp: data.timestamp
+            }
           ]);
         });
 
@@ -354,6 +414,15 @@ export default function LobbyPage() {
 
   const handleMafiaStartGame = () => {
     mafiaRoom?.send(ClientMessageType.START_GAME);
+  };
+
+  const handleToggleManualMafia = (targetPlayerId: string) => {
+    if (!mafiaIsHost || !mafiaRoom) return;
+    const next = manualMafiaPlayerIds.includes(targetPlayerId)
+      ? manualMafiaPlayerIds.filter((id) => id !== targetPlayerId)
+      : [...manualMafiaPlayerIds, targetPlayerId];
+    setManualMafiaPlayerIds(next);
+    mafiaRoom.send(ClientMessageType.SET_MANUAL_MAFIA, { mafiaPlayerIds: next });
   };
 
   const handleSendChat = (e: React.FormEvent) => {
@@ -487,11 +556,21 @@ export default function LobbyPage() {
         phaseEndsAt={mafiaPhaseEndsAt}
         winningTeam={mafiaWinningTeam}
         isHost={mafiaIsHost}
+        myRole={myRole}
+        mafiaTeammates={mafiaTeammates}
+        allRevealedRoles={allRevealedRoles}
         chatMessages={chatMessages}
-        onSendChat={(msg) => {
-          mafiaRoom.send(ClientMessageType.SEND_CHAT, { message: msg });
+        onSendChat={(msg, channel = "PUBLIC") => {
+          mafiaRoom.send(ClientMessageType.SEND_CHAT, { message: msg, channel });
         }}
-        onReturnToLobby={() => mafiaRoom.send(ClientMessageType.RESET_TO_LOBBY)}
+        onReturnToLobby={() => {
+          myRoleRef.current = null;
+          roleRequestedRef.current = false;
+          setMyRole(null);
+          setMafiaTeammates([]);
+          setAllRevealedRoles(null);
+          mafiaRoom.send(ClientMessageType.RESET_TO_LOBBY);
+        }}
         onLeaveRoom={handleLeaveRoom}
       />
     );
@@ -501,10 +580,19 @@ export default function LobbyPage() {
   // RENDER VIEW 4: MAFIA 3D LOBBY
   // ---------------------------------------------------------------------------------
   const minRequired = mafiaConfig.isDevMode ? 3 : 5;
-  const canStart = mafiaPlayers.length >= minRequired;
   const roleBreakdown = mafiaPlayers.length >= (mafiaConfig.isDevMode ? 3 : 5)
-    ? calculateRoleCounts(mafiaPlayers.length, mafiaConfig.mafiaPercentage, mafiaConfig.isDevMode)
+    ? calculateRoleCounts(
+        mafiaPlayers.length,
+        mafiaConfig.mafiaPercentage,
+        mafiaConfig.isDevMode,
+        mafiaConfig.mafiaCount > 0 ? mafiaConfig.mafiaCount : undefined
+      )
     : null;
+  const expectedMafiaCount = roleBreakdown?.mafiaCount ?? 0;
+  const isManualValid =
+    mafiaConfig.assignmentMethod !== AssignmentMethod.MANUAL ||
+    manualMafiaPlayerIds.length === expectedMafiaCount;
+  const canStart = mafiaPlayers.length >= minRequired && isManualValid;
 
   return (
     <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
@@ -605,7 +693,24 @@ export default function LobbyPage() {
                     </div>
                   </div>
 
-                  <div>
+                  <div className="flex items-center space-x-2">
+                    {/* Host Manual Mafia Assignment Selector */}
+                    {mafiaIsHost && mafiaConfig.assignmentMethod === AssignmentMethod.MANUAL && (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleManualMafia(p.id)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold flex items-center space-x-1 transition ${
+                          manualMafiaPlayerIds.includes(p.id)
+                            ? "bg-blood-600 text-white shadow-md shadow-blood-600/40 ring-1 ring-blood-500"
+                            : "bg-noir-900 text-noir-400 hover:text-white border border-noir-700"
+                        }`}
+                        title={manualMafiaPlayerIds.includes(p.id) ? "Designated as Mafia" : "Assign to Mafia"}
+                      >
+                        <Skull className="w-3.5 h-3.5" />
+                        <span>{manualMafiaPlayerIds.includes(p.id) ? "Mafia" : "Pick"}</span>
+                      </button>
+                    )}
+
                     {p.isReady ? (
                       <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-mono font-semibold">
                         <CheckCircle2 className="w-3 h-3" />
@@ -622,6 +727,20 @@ export default function LobbyPage() {
               );
             })}
           </div>
+
+          {/* Manual Assignment Progress Alert */}
+          {mafiaConfig.assignmentMethod === AssignmentMethod.MANUAL && (
+            <div className={`p-2.5 rounded-xl border text-xs font-mono flex items-center justify-between ${
+              manualMafiaPlayerIds.length === expectedMafiaCount
+                ? "bg-emerald-950/30 border-emerald-500/40 text-emerald-300"
+                : "bg-amber-950/30 border-amber-500/40 text-amber-300"
+            }`}>
+              <span className="font-semibold">Host Manual Assignment:</span>
+              <span className="font-bold">
+                {manualMafiaPlayerIds.length} / {expectedMafiaCount} Mafia Assigned
+              </span>
+            </div>
+          )}
 
           <div className="pt-2 border-t border-noir-800 flex space-x-3">
             <button
@@ -640,6 +759,11 @@ export default function LobbyPage() {
               <button
                 disabled={!canStart}
                 onClick={handleMafiaStartGame}
+                title={
+                  !canStart && mafiaConfig.assignmentMethod === AssignmentMethod.MANUAL && manualMafiaPlayerIds.length !== expectedMafiaCount
+                    ? `Assign exactly ${expectedMafiaCount} Mafia players before starting`
+                    : undefined
+                }
                 className="flex-1 py-3 px-4 bg-gradient-to-r from-blood-600 to-blood-500 hover:from-blood-500 hover:to-blood-400 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl shadow-lg shadow-blood-600/30 flex items-center justify-center space-x-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Play className="w-4 h-4 fill-white" />
@@ -661,24 +785,74 @@ export default function LobbyPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Assignment Method */}
               <div className="space-y-1.5">
                 <label className="text-xs font-mono text-noir-300 flex items-center justify-between">
-                  <span>MAFIA RATIO</span>
-                  <span className="font-mono text-blood-400 font-bold">{mafiaConfig.mafiaPercentage}%</span>
+                  <span>ASSIGNMENT METHOD</span>
+                  <span className="font-mono text-amber-400 font-bold">
+                    {mafiaConfig.assignmentMethod === AssignmentMethod.MANUAL ? "Host Manual" : "Random"}
+                  </span>
                 </label>
                 <select
                   disabled={!mafiaIsHost}
-                  value={mafiaConfig.mafiaPercentage}
-                  onChange={(e) => handleMafiaConfigChange({ mafiaPercentage: Number(e.target.value) })}
+                  value={mafiaConfig.assignmentMethod}
+                  onChange={(e) =>
+                    handleMafiaConfigChange({
+                      assignmentMethod: e.target.value as AssignmentMethod
+                    })
+                  }
                   className="w-full bg-noir-950 border border-noir-700 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-blood-500 disabled:opacity-75"
                 >
-                  <option value={15}>15% (Light)</option>
-                  <option value={20}>20% (Standard)</option>
-                  <option value={25}>25% (High Danger)</option>
-                  <option value={30}>30% (Mayhem)</option>
+                  <option value={AssignmentMethod.RANDOM}>Random Distribution</option>
+                  <option value={AssignmentMethod.MANUAL}>Manual Host Assignment</option>
                 </select>
               </div>
 
+              {/* Mafia Count / Ratio */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono text-noir-300 flex items-center justify-between">
+                  <span>MAFIA COUNT / RATIO</span>
+                  <span className="font-mono text-blood-400 font-bold">
+                    {mafiaConfig.mafiaCount > 0
+                      ? `${mafiaConfig.mafiaCount} Mafia (Exact)`
+                      : `${mafiaConfig.mafiaPercentage}% (Auto)`}
+                  </span>
+                </label>
+                <select
+                  disabled={!mafiaIsHost}
+                  value={mafiaConfig.mafiaCount > 0 ? String(mafiaConfig.mafiaCount) : `pct-${mafiaConfig.mafiaPercentage}`}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val.startsWith("pct-")) {
+                      handleMafiaConfigChange({
+                        mafiaPercentage: Number(val.replace("pct-", "")),
+                        mafiaCount: 0
+                      });
+                    } else {
+                      handleMafiaConfigChange({
+                        mafiaCount: Number(val)
+                      });
+                    }
+                  }}
+                  className="w-full bg-noir-950 border border-noir-700 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-blood-500 disabled:opacity-75"
+                >
+                  <optgroup label="Percentage-Based (Auto)">
+                    <option value="pct-15">15% (Light)</option>
+                    <option value="pct-20">20% (Standard)</option>
+                    <option value="pct-25">25% (High Danger)</option>
+                    <option value="pct-30">30% (Mayhem)</option>
+                  </optgroup>
+                  <optgroup label="Exact Mafia Count">
+                    <option value="1">Exact: 1 Mafia</option>
+                    <option value="2">Exact: 2 Mafia</option>
+                    <option value="3">Exact: 3 Mafia</option>
+                    <option value="4">Exact: 4 Mafia</option>
+                    <option value="5">Exact: 5 Mafia</option>
+                  </optgroup>
+                </select>
+              </div>
+
+              {/* Night Duration */}
               <div className="space-y-1.5">
                 <label className="text-xs font-mono text-noir-300 flex items-center justify-between">
                   <span>NIGHT DURATION</span>
@@ -697,38 +871,29 @@ export default function LobbyPage() {
                 </select>
               </div>
 
+              {/* Unified Day Duration */}
               <div className="space-y-1.5">
                 <label className="text-xs font-mono text-noir-300 flex items-center justify-between">
-                  <span>DAY DISCUSSION</span>
-                  <span className="font-mono text-white font-bold">{mafiaConfig.discussionDurationSec}s</span>
+                  <span>DAY DURATION (DISCUSSION & VOTING)</span>
+                  <span className="font-mono text-white font-bold">{mafiaConfig.dayDurationSec}s</span>
                 </label>
                 <select
                   disabled={!mafiaIsHost}
-                  value={mafiaConfig.discussionDurationSec}
-                  onChange={(e) => handleMafiaConfigChange({ discussionDurationSec: Number(e.target.value) })}
+                  value={mafiaConfig.dayDurationSec}
+                  onChange={(e) =>
+                    handleMafiaConfigChange({
+                      dayDurationSec: Number(e.target.value),
+                      discussionDurationSec: Number(e.target.value)
+                    })
+                  }
                   className="w-full bg-noir-950 border border-noir-700 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-blood-500 disabled:opacity-75"
                 >
+                  <option value={45}>45 seconds</option>
                   <option value={60}>60 seconds</option>
                   <option value={90}>90 seconds</option>
                   <option value={120}>120 seconds (Default)</option>
                   <option value={180}>180 seconds</option>
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono text-noir-300 flex items-center justify-between">
-                  <span>PUBLIC VOTING</span>
-                  <span className="font-mono text-white font-bold">{mafiaConfig.votingDurationSec}s</span>
-                </label>
-                <select
-                  disabled={!mafiaIsHost}
-                  value={mafiaConfig.votingDurationSec}
-                  onChange={(e) => handleMafiaConfigChange({ votingDurationSec: Number(e.target.value) })}
-                  className="w-full bg-noir-950 border border-noir-700 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-blood-500 disabled:opacity-75"
-                >
-                  <option value={20}>20 seconds</option>
-                  <option value={30}>30 seconds (Default)</option>
-                  <option value={45}>45 seconds</option>
+                  <option value={240}>240 seconds</option>
                 </select>
               </div>
             </div>
@@ -759,7 +924,14 @@ export default function LobbyPage() {
 
             {roleBreakdown && (
               <div className="p-3 bg-noir-950 border border-noir-800 rounded-xl flex items-center justify-between text-xs font-mono">
-                <span className="text-noir-400">At current settings:</span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-noir-400">Roster Projection:</span>
+                  {mafiaConfig.assignmentMethod === AssignmentMethod.MANUAL && (
+                    <span className="px-1.5 py-0.5 rounded bg-amber-950/60 text-amber-400 border border-amber-800/60 text-[10px]">
+                      Manual ({manualMafiaPlayerIds.length}/{roleBreakdown.mafiaCount} Picked)
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center space-x-4">
                   <span className="text-blood-400 flex items-center space-x-1">
                     <Skull className="w-3.5 h-3.5 inline" />

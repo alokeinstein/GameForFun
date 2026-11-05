@@ -17,6 +17,7 @@ import {
 } from "@mafia/shared";
 import { ShootingCharacterAvatar } from "./ShootingCharacterAvatar";
 import { combatAudio } from "../../utils/combatAudio";
+import { loadShootingSettings, ShootingControlSettings } from "../../utils/shootingSettings";
 
 interface ShootingCharacterControllerProps {
   room: Room<ShootingRoomState>;
@@ -42,20 +43,32 @@ export function ShootingCharacterController({
 
   const initialSpawn = teamSpawns[player.teamId] || [0, 0.4, 0];
 
-  // Cache initial position ONCE on mount to prevent Rapier from snapping on state updates
-  const initialPos = useRef<[number, number, number]>([
-    player.x && Math.abs(player.x) > 0.1 ? player.x : initialSpawn[0],
-    initialSpawn[1],
-    player.z && Math.abs(player.z) > 0.1 ? player.z : initialSpawn[2]
-  ]).current;
+  const spawnX = player.x && Math.abs(player.x) > 0.1 ? player.x : initialSpawn[0];
+  const spawnZ = player.z && Math.abs(player.z) > 0.1 ? player.z : initialSpawn[2];
 
-  const [animationState, setAnimationState] = useState<"idle" | "walk" | "run" | "jump">("idle");
+  // Cache initial position ONCE on mount
+  const initialPos = useRef<[number, number, number]>([spawnX, initialSpawn[1], spawnZ]).current;
+
+  const [animationState, setAnimationState] = useState<"idle" | "walk" | "run" | "jump" | "crouch" | "aim">("idle");
+
+  // Dynamic player & room refs to decouple event listeners from state changes
+  const playerRef = useRef(player);
+  playerRef.current = player;
+  const roomRef = useRef(room);
+  roomRef.current = room;
+
+  // Settings
+  const settingsRef = useRef<ShootingControlSettings>(loadShootingSettings());
 
   // GTA-Style Third-Person Spherical Orbit Camera State
-  const cameraYaw = useRef(0);
-  const cameraPitch = useRef(0.22);
-  const cameraDistance = useRef(6.5);
+  // Initialize camera yaw to point towards arena center [0, 0, 0]
+  const cameraYaw = useRef(Math.atan2(spawnX, spawnZ));
+  const cameraPitch = useRef(0.20);
+  const cameraDistance = useRef(6.2);
   const isPointerLocked = useRef(false);
+
+  // Recoil recovery offset
+  const recoilPitchOffset = useRef(0);
 
   // Combat State
   const isFiring = useRef(false);
@@ -77,19 +90,48 @@ export function ShootingCharacterController({
     right: boolean;
     sprint: boolean;
     jump: boolean;
+    crouch: boolean;
   }>({
     forward: false,
     backward: false,
     left: false,
     right: false,
     sprint: false,
-    jump: false
+    jump: false,
+    crouch: false
   });
 
   // Network sync throttler (20 Hz = 50ms interval)
   const lastSyncTime = useRef(0);
 
   useEffect(() => {
+    const handleAdsEvent = (e: any) => {
+      if (typeof e.detail?.isAiming === "boolean") {
+        isAiming.current = e.detail.isAiming;
+      }
+    };
+    window.addEventListener("shooting:ads", handleAdsEvent);
+
+    const handleSettingsUpdated = () => {
+      settingsRef.current = loadShootingSettings();
+    };
+    window.addEventListener("shooting:settings_updated", handleSettingsUpdated);
+
+    const resetAllInputs = () => {
+      keys.current.forward = false;
+      keys.current.backward = false;
+      keys.current.left = false;
+      keys.current.right = false;
+      keys.current.sprint = false;
+      keys.current.jump = false;
+      keys.current.crouch = false;
+      isFiring.current = false;
+      if (isAiming.current) {
+        isAiming.current = false;
+        window.dispatchEvent(new CustomEvent("shooting:ads", { detail: { isAiming: false } }));
+      }
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore key events when typing in chat/input
       if (
@@ -99,78 +141,95 @@ export function ShootingCharacterController({
         return;
       }
 
-      switch (e.code) {
-        case "KeyW":
-        case "ArrowUp":
-          keys.current.forward = true;
-          break;
-        case "KeyS":
-        case "ArrowDown":
-          keys.current.backward = true;
-          break;
-        case "KeyA":
-        case "ArrowLeft":
-          keys.current.left = true;
-          break;
-        case "KeyD":
-        case "ArrowRight":
-          keys.current.right = true;
-          break;
-        case "ShiftLeft":
-        case "ShiftRight":
-          keys.current.sprint = true;
-          break;
-        case "Space":
-          e.preventDefault();
-          if (canJump.current && !isJumping.current) {
-            keys.current.jump = true;
-            combatAudio.playJump();
-          }
-          break;
-        case "KeyR":
-          if (player.isAlive && !player.isReloading && player.ammo < player.maxAmmo && player.reserveAmmo > 0) {
-            room.send(ClientMessageType.SHOOTING_RELOAD, {});
-            combatAudio.playReload();
-          }
-          break;
+      const bindings = settingsRef.current.keyBindings;
+
+      // Weapon Loadout Quick-Select: 1, 2, 3, 4, 5
+      const weaponSlots: Record<string, WeaponId> = {
+        Digit1: WeaponId.ASSAULT_RIFLE,
+        Digit2: WeaponId.SHOTGUN,
+        Digit3: WeaponId.SNIPER_RIFLE,
+        Digit4: WeaponId.SMG,
+        Digit5: WeaponId.PISTOL
+      };
+
+      if (weaponSlots[e.code]) {
+        const targetWeapon = weaponSlots[e.code];
+        // Allow switching weapon loadout if dead or in lobby
+        const p = playerRef.current;
+        if (!p.isAlive || roomRef.current.state.status === "LOBBY") {
+          combatAudio.playWeaponSwitch();
+          roomRef.current.send(ClientMessageType.SHOOTING_SELECT_LOADOUT, { weaponId: targetWeapon });
+        }
+        return;
+      }
+
+      // Movement & Actions
+      if (e.code === bindings.forward || e.code === "KeyW" || e.code === "ArrowUp") {
+        keys.current.forward = true;
+      } else if (e.code === bindings.backward || e.code === "KeyS" || e.code === "ArrowDown") {
+        keys.current.backward = true;
+      } else if (e.code === bindings.left || e.code === "KeyA" || e.code === "ArrowLeft") {
+        keys.current.left = true;
+      } else if (e.code === bindings.right || e.code === "KeyD" || e.code === "ArrowRight") {
+        keys.current.right = true;
+      } else if (e.code === bindings.sprint || e.code === "ShiftLeft" || e.code === "ShiftRight") {
+        keys.current.sprint = true;
+      } else if (e.code === bindings.crouch || e.code === "ControlLeft" || e.code === "ControlRight" || e.code === "KeyC") {
+        keys.current.crouch = true;
+      } else if (e.code === bindings.jump || e.code === "Space") {
+        if (canJump.current && !isJumping.current) {
+          isJumping.current = true;
+          canJump.current = false;
+          combatAudio.playJump();
+          setTimeout(() => {
+            isJumping.current = false;
+          }, 350);
+          setTimeout(() => {
+            canJump.current = true;
+          }, 600);
+        }
+      } else if (e.code === bindings.reload || e.code === "KeyR") {
+        const p = playerRef.current;
+        const curW = WEAPONS_CATALOG[p.weaponId as WeaponId] || WEAPONS_CATALOG[WeaponId.ASSAULT_RIFLE];
+        if (p.isAlive && !p.isReloading && p.ammo < curW.magazineCapacity && p.reserveAmmo > 0) {
+          combatAudio.playReload();
+          roomRef.current.send(ClientMessageType.SHOOTING_RELOAD);
+        }
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      switch (e.code) {
-        case "KeyW":
-        case "ArrowUp":
-          keys.current.forward = false;
-          break;
-        case "KeyS":
-        case "ArrowDown":
-          keys.current.backward = false;
-          break;
-        case "KeyA":
-        case "ArrowLeft":
-          keys.current.left = false;
-          break;
-        case "KeyD":
-        case "ArrowRight":
-          keys.current.right = false;
-          break;
-        case "ShiftLeft":
-        case "ShiftRight":
-          keys.current.sprint = false;
-          break;
-        case "Space":
-          keys.current.jump = false;
-          break;
+      const bindings = settingsRef.current.keyBindings;
+
+      if (e.code === bindings.forward || e.code === "KeyW" || e.code === "ArrowUp") {
+        keys.current.forward = false;
+      } else if (e.code === bindings.backward || e.code === "KeyS" || e.code === "ArrowDown") {
+        keys.current.backward = false;
+      } else if (e.code === bindings.left || e.code === "KeyA" || e.code === "ArrowLeft") {
+        keys.current.left = false;
+      } else if (e.code === bindings.right || e.code === "KeyD" || e.code === "ArrowRight") {
+        keys.current.right = false;
+      } else if (e.code === bindings.sprint || e.code === "ShiftLeft" || e.code === "ShiftRight") {
+        keys.current.sprint = false;
+      } else if (e.code === bindings.crouch || e.code === "ControlLeft" || e.code === "ControlRight" || e.code === "KeyC") {
+        keys.current.crouch = false;
       }
     };
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!isPointerLocked.current) return;
-      const sensitivity = isAiming.current
-        ? (player.weaponId === WeaponId.SNIPER_RIFLE ? 0.0008 : 0.0012)
-        : 0.0022;
-      cameraYaw.current -= e.movementX * sensitivity;
-      cameraPitch.current = Math.max(-0.2, Math.min(1.2, cameraPitch.current + e.movementY * sensitivity));
+
+      const s = settingsRef.current;
+      let sens = s.mouseSensitivity;
+      if (isAiming.current) {
+        sens *= playerRef.current.weaponId === WeaponId.SNIPER_RIFLE
+          ? s.scopedSensitivityMultiplier
+          : s.aimSensitivityMultiplier;
+      }
+
+      cameraYaw.current -= e.movementX * sens;
+      const pitchDelta = (s.invertY ? -1 : 1) * e.movementY * sens;
+      cameraPitch.current = Math.max(-0.35, Math.min(1.15, cameraPitch.current + pitchDelta));
     };
 
     const handleWheel = (e: WheelEvent) => {
@@ -178,8 +237,12 @@ export function ShootingCharacterController({
     };
 
     const handleMouseDown = (e: MouseEvent) => {
+      if (document.querySelector("[data-no-pointer-lock]")) {
+        return;
+      }
+
       const target = e.target as HTMLElement;
-      if (target.tagName === "BUTTON" || target.closest("button") || target.tagName === "INPUT") {
+      if (target.tagName === "BUTTON" || target.closest("button") || target.tagName === "INPUT" || target.closest("[data-no-pointer-lock]")) {
         return;
       }
 
@@ -190,21 +253,32 @@ export function ShootingCharacterController({
         return;
       }
 
-      if (e.button === 0) {
-        if (player.ammo <= 0 && player.isAlive && !player.isReloading) {
+      const isLeftHanded = settingsRef.current.isLeftHandedPreset;
+      const fireButton = isLeftHanded ? 2 : 0;
+      const aimButton = isLeftHanded ? 0 : 2;
+
+      if (e.button === fireButton) {
+        const p = playerRef.current;
+        if (p.ammo <= 0 && p.isAlive && !p.isReloading) {
           combatAudio.playDryFire();
         }
         isFiring.current = true;
-      } else if (e.button === 2) {
+      } else if (e.button === aimButton) {
         isAiming.current = true;
+        window.dispatchEvent(new CustomEvent("shooting:ads", { detail: { isAiming: true } }));
       }
     };
 
     const handleMouseUp = (e: MouseEvent) => {
-      if (e.button === 0) {
+      const isLeftHanded = settingsRef.current.isLeftHandedPreset;
+      const fireButton = isLeftHanded ? 2 : 0;
+      const aimButton = isLeftHanded ? 0 : 2;
+
+      if (e.button === fireButton) {
         isFiring.current = false;
-      } else if (e.button === 2) {
+      } else if (e.button === aimButton) {
         isAiming.current = false;
+        window.dispatchEvent(new CustomEvent("shooting:ads", { detail: { isAiming: false } }));
       }
     };
 
@@ -213,10 +287,19 @@ export function ShootingCharacterController({
     };
 
     const handlePointerLockChange = () => {
-      isPointerLocked.current = document.pointerLockElement === document.body;
+      isPointerLocked.current = document.pointerLockElement !== null;
       if (!isPointerLocked.current) {
-        isFiring.current = false;
-        isAiming.current = false;
+        resetAllInputs();
+      }
+    };
+
+    const handleBlur = () => {
+      resetAllInputs();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        resetAllInputs();
       }
     };
 
@@ -224,7 +307,8 @@ export function ShootingCharacterController({
     room.onMessage(
       ServerMessageType.SHOOTING_PLAYER_RESPAWNED,
       (payload: { playerId: string; x: number; y: number; z: number }) => {
-        if (payload.playerId === player.id) {
+        if (payload.playerId === playerRef.current.id) {
+          combatAudio.playRespawn();
           const rb = rigidBodyRef.current;
           if (rb) {
             rb.setTranslation({ x: payload.x, y: payload.y, z: payload.z }, true);
@@ -234,6 +318,8 @@ export function ShootingCharacterController({
           if (focusTarget.current) {
             focusTarget.current.set(payload.x, payload.y + 0.95, payload.z);
           }
+          // Face toward map center
+          cameraYaw.current = Math.atan2(payload.x, payload.z);
         }
       }
     );
@@ -245,9 +331,14 @@ export function ShootingCharacterController({
     window.addEventListener("mousedown", handleMouseDown);
     window.addEventListener("mouseup", handleMouseUp);
     window.addEventListener("contextmenu", handleContextMenu);
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("focus", resetAllInputs);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     document.addEventListener("pointerlockchange", handlePointerLockChange);
 
     return () => {
+      window.removeEventListener("shooting:ads", handleAdsEvent);
+      window.removeEventListener("shooting:settings_updated", handleSettingsUpdated);
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("mousemove", handleMouseMove);
@@ -255,12 +346,15 @@ export function ShootingCharacterController({
       window.removeEventListener("mousedown", handleMouseDown);
       window.removeEventListener("mouseup", handleMouseUp);
       window.removeEventListener("contextmenu", handleContextMenu);
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("focus", resetAllInputs);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       document.removeEventListener("pointerlockchange", handlePointerLockChange);
       if (document.pointerLockElement) {
         document.exitPointerLock();
       }
     };
-  }, [player.id, player.isAlive, player.isReloading, player.ammo, player.maxAmmo, player.reserveAmmo, player.weaponId, room]);
+  }, [room]);
 
   useFrame((state, delta) => {
     const rb = rigidBodyRef.current;
@@ -338,72 +432,92 @@ export function ShootingCharacterController({
     // -------------------------------------------------------------------------
     // 3. HORIZONTAL MOVEMENT (Decoupled from Pitch)
     // -------------------------------------------------------------------------
-    const moveSpeed = keys.current.sprint ? 8.8 : 5.0;
+    let speed = 5.0;
+    if (keys.current.crouch) {
+      speed = 2.8;
+    } else if (keys.current.sprint) {
+      speed = 8.5;
+    } else if (isAiming.current) {
+      speed = 3.6;
+    }
+
     let targetVelX = 0;
     let targetVelZ = 0;
+    const heading = cameraYaw.current;
 
-    if (isMoving) {
-      const heading = cameraYaw.current;
+    // Movement is disabled when dead
+    if (isMoving && player.isAlive) {
       const forwardX = -Math.sin(heading);
       const forwardZ = -Math.cos(heading);
       const rightX = Math.cos(heading);
       const rightZ = -Math.sin(heading);
 
-      let vx = forwardX * moveZ + rightX * moveX;
-      let vz = forwardZ * moveZ + rightZ * moveX;
-      const len = Math.hypot(vx, vz);
-      if (len > 0.001) {
-        vx /= len;
-        vz /= len;
+      let dirX = forwardX * moveZ + rightX * moveX;
+      let dirZ = forwardZ * moveZ + rightZ * moveX;
+      const length = Math.hypot(dirX, dirZ);
+      if (length > 0.0001) {
+        dirX /= length;
+        dirZ /= length;
       }
+      targetVelX = dirX * speed;
+      targetVelZ = dirZ * speed;
+    }
 
-      targetVelX = vx * moveSpeed;
-      targetVelZ = vz * moveSpeed;
-
-      // Face character mesh in movement direction
-      const targetRotationY = Math.atan2(vx, vz);
-      if (avatarGroupRef.current) {
-        const curRot = avatarGroupRef.current.rotation.y;
-        let diff = targetRotationY - curRot;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-        avatarGroupRef.current.rotation.y += diff * Math.min(1, delta * 16);
-      }
+    // Clear ADS if eliminated
+    if (!player.isAlive && isAiming.current) {
+      isAiming.current = false;
+      window.dispatchEvent(new CustomEvent("shooting:ads", { detail: { isAiming: false } }));
     }
 
     // -------------------------------------------------------------------------
-    // 4. VERTICAL VELOCITY & JUMP LOGIC
+    // 4. VERTICAL VELOCITY & GROUND SNAPPING
     // -------------------------------------------------------------------------
-    let nextVelY = currentVel.y;
+    let targetVelY = currentVel.y;
 
-    if (keys.current.jump && isGrounded && canJump.current) {
-      nextVelY = 7.4; // Crisp vertical launch
-      isJumping.current = true;
-      canJump.current = false;
-      keys.current.jump = false;
-      setTimeout(() => {
-        canJump.current = true;
-      }, 350);
-    } else if (stepClimbingAssist) {
-      nextVelY = 2.8; // Forward step climb assist
+    if (isJumping.current && isGrounded && player.isAlive) {
+      targetVelY = 7.0;
+    } else if (stepClimbingAssist && player.isAlive) {
+      targetVelY = 2.8;
     } else if (isGrounded && !isJumping.current) {
-      nextVelY = -0.6; // Clamp to ground, suppressing sprint hops
-    } else if (!isGrounded && !isJumping.current && clearance > 0.14 && clearance <= 0.45) {
-      nextVelY = -3.2; // Snap down onto descending stairs/slopes
+      if (clearance > 0.02 && clearance <= 0.14) {
+        targetVelY = -clearance * 18;
+      } else {
+        targetVelY = 0;
+      }
+    } else {
+      targetVelY = Math.max(-28, currentVel.y - 18 * delta);
     }
 
-    if (isJumping.current && isGrounded && nextVelY <= 0) {
-      isJumping.current = false;
-    }
+    rb.setLinvel({ x: targetVelX, y: targetVelY, z: targetVelZ }, true);
 
-    rb.setLinvel({ x: targetVelX, y: nextVelY, z: targetVelZ }, true);
+    // Dynamic Character Avatar Facing Rotation & Scoped Visibility
+    if (avatarGroupRef.current) {
+      const isSniperAiming = isAiming.current && player.weaponId === WeaponId.SNIPER_RIFLE;
+      avatarGroupRef.current.visible = !isSniperAiming;
+
+      if (player.isAlive) {
+        if (isAiming.current) {
+          // Face camera aim forward direction
+          avatarGroupRef.current.rotation.y = heading + Math.PI;
+        } else if (isMoving) {
+          const moveAngle = Math.atan2(targetVelX, targetVelZ);
+          avatarGroupRef.current.rotation.y = moveAngle;
+        }
+      }
+    }
 
     // -------------------------------------------------------------------------
     // 5. ANIMATION STATE MACHINE
     // -------------------------------------------------------------------------
-    let newAnim: "idle" | "walk" | "run" | "jump" = "idle";
-    if (isJumping.current || (!isGrounded && clearance > 0.35)) {
+    let newAnim: "idle" | "walk" | "run" | "jump" | "crouch" | "aim" = "idle";
+    if (!player.isAlive) {
+      newAnim = "idle";
+    } else if (isJumping.current || (!isGrounded && clearance > 0.35)) {
       newAnim = "jump";
+    } else if (keys.current.crouch) {
+      newAnim = "crouch";
+    } else if (isAiming.current) {
+      newAnim = "aim";
     } else if (isMoving) {
       newAnim = keys.current.sprint ? "run" : "walk";
     }
@@ -414,29 +528,41 @@ export function ShootingCharacterController({
     // -------------------------------------------------------------------------
     // 6. THIRD-PERSON SPHERICAL ORBIT CAMERA & ADS ZOOM
     // -------------------------------------------------------------------------
+    const isSniperAiming = isAiming.current && player.weaponId === WeaponId.SNIPER_RIFLE;
     const targetDistance = isAiming.current
-      ? (player.weaponId === WeaponId.SNIPER_RIFLE ? 2.2 : 3.6)
-      : 6.2;
-    cameraDistance.current = THREE.MathUtils.lerp(cameraDistance.current, targetDistance, delta * 12);
+      ? (isSniperAiming ? 0.05 : 3.4)
+      : (!player.isAlive ? 5.0 : 6.2);
+    cameraDistance.current = THREE.MathUtils.lerp(cameraDistance.current, targetDistance, delta * 14);
 
+    // Recoil recovery decay
+    recoilPitchOffset.current = THREE.MathUtils.lerp(recoilPitchOffset.current, 0, delta * 14);
+
+    const targetHeight = !player.isAlive
+      ? 0.35
+      : (keys.current.crouch ? 0.55 : (isSniperAiming ? 1.55 : 0.95));
     if (!focusTarget.current) {
-      focusTarget.current = new THREE.Vector3(currentPos.x, currentPos.y + 0.95, currentPos.z);
+      focusTarget.current = new THREE.Vector3(currentPos.x, currentPos.y + targetHeight, currentPos.z);
     } else {
       focusTarget.current.x = THREE.MathUtils.lerp(focusTarget.current.x, currentPos.x, delta * 14);
-      focusTarget.current.y = THREE.MathUtils.lerp(focusTarget.current.y, currentPos.y + 0.95, delta * 10);
+      focusTarget.current.y = THREE.MathUtils.lerp(focusTarget.current.y, currentPos.y + targetHeight, delta * 12);
       focusTarget.current.z = THREE.MathUtils.lerp(focusTarget.current.z, currentPos.z, delta * 14);
     }
 
     const yaw = cameraYaw.current;
-    const pitch = cameraPitch.current;
+    const pitch = cameraPitch.current + recoilPitchOffset.current;
     const dist = cameraDistance.current;
 
-    const camX = focusTarget.current.x + dist * Math.sin(yaw) * Math.cos(pitch);
-    const camY = focusTarget.current.y + dist * Math.sin(pitch);
-    const camZ = focusTarget.current.z + dist * Math.cos(yaw) * Math.cos(pitch);
+    // Lateral shoulder offset when ADS for tactical over-the-shoulder perspective (0 for sniper optic)
+    const shoulderOffset = isAiming.current ? (isSniperAiming ? 0.0 : 0.45) : 0.0;
+    const rightX = Math.cos(yaw) * shoulderOffset;
+    const rightZ = -Math.sin(yaw) * shoulderOffset;
 
-    state.camera.position.set(camX, Math.max(focusTarget.current.y + 0.4, camY), camZ);
-    state.camera.lookAt(focusTarget.current);
+    const camX = focusTarget.current.x + dist * Math.sin(yaw) * Math.cos(pitch) + rightX;
+    const camY = focusTarget.current.y + dist * Math.sin(pitch);
+    const camZ = focusTarget.current.z + dist * Math.cos(yaw) * Math.cos(pitch) + rightZ;
+
+    state.camera.position.set(camX, Math.max(focusTarget.current.y + 0.3, camY), camZ);
+    state.camera.lookAt(focusTarget.current.x + rightX * 0.5, focusTarget.current.y, focusTarget.current.z + rightZ * 0.5);
 
     // -------------------------------------------------------------------------
     // 7. WEAPON FIRING LOOP (Automatic & Semi-Automatic)
@@ -475,9 +601,10 @@ export function ShootingCharacterController({
     // 1. Procedural gunshot audio
     combatAudio.playGunshot(currentWeapon.soundType);
 
-    // 2. Camera recoil & spread kick
-    cameraPitch.current = Math.min(1.2, cameraPitch.current + currentWeapon.recoilIntensity * 0.22);
-    cameraYaw.current += (Math.random() - 0.5) * currentWeapon.spreadAngleRad * 0.4;
+    // 2. Realistic Camera Recoil Kick & Spread
+    const recoilKick = currentWeapon.recoilIntensity * 0.18;
+    recoilPitchOffset.current = Math.min(0.25, recoilPitchOffset.current + recoilKick);
+    cameraYaw.current += (Math.random() - 0.5) * currentWeapon.spreadAngleRad * 0.25;
 
     // 3. Camera forward ray
     const camPos = camera.position;
@@ -530,12 +657,16 @@ export function ShootingCharacterController({
           minT = t;
           bestTargetId = otherPlayer.id;
           bestHitPoint = { x: qx, y: qy, z: qz };
-          if (h >= 1.40) {
+
+          // Multi-region hierarchical hitbox
+          if (h >= 1.45) {
             bestRegion = HitRegion.HEAD;
-          } else if (h >= 0.95) {
+          } else if (h >= 1.05) {
             bestRegion = HitRegion.UPPER_TORSO;
-          } else if (h >= 0.70) {
+          } else if (h >= 0.75) {
             bestRegion = HitRegion.ABDOMEN;
+          } else if (distH > 0.28 && h >= 0.75) {
+            bestRegion = HitRegion.ARMS;
           } else {
             bestRegion = HitRegion.LEGS;
           }
@@ -543,14 +674,19 @@ export function ShootingCharacterController({
       }
     });
 
-    // 6. Send SHOOTING_FIRE
+    // 6. Send authoritative fire message to Colyseus server
     room.send(ClientMessageType.SHOOTING_FIRE, {
-      origin: { x: currentPos.x, y: currentPos.y + 1.2, z: currentPos.z },
-      direction: { x: camDir.x, y: camDir.y, z: camDir.z },
+      weaponId: currentWeapon.id,
+      timestamp: Date.now(),
       targetPlayerId: bestTargetId,
       hitRegion: bestTargetId ? bestRegion : undefined,
       hitPoint: bestHitPoint,
-      clientTimestamp: Date.now()
+      camX: camPos.x,
+      camY: camPos.y,
+      camZ: camPos.z,
+      dirX: camDir.x,
+      dirY: camDir.y,
+      dirZ: camDir.z
     });
   };
 
@@ -558,17 +694,16 @@ export function ShootingCharacterController({
     <RigidBody
       ref={rigidBodyRef}
       colliders={false}
-      type="dynamic"
       position={initialPos}
       enabledRotations={[false, false, false]}
-      friction={0}
-      restitution={0}
-      linearDamping={0.4}
-      ccd={true}
+      linearDamping={4.0}
+      mass={75}
+      type="dynamic"
     >
-      {/* Dynamic Player Capsule Collider */}
+      {/* Physics Capsule matching human dimensions: R=0.35m, H=1.1m (total 1.8m) */}
       <CapsuleCollider args={[0.55, 0.35]} position={[0, 0.9, 0]} />
 
+      {/* Visual Avatar Mesh Group */}
       <group ref={avatarGroupRef}>
         <ShootingCharacterAvatar
           displayName={player.displayName}
@@ -579,9 +714,9 @@ export function ShootingCharacterController({
           health={player.health}
           maxHealth={player.maxHealth}
           animationState={animationState}
+          isReloading={player.isReloading}
         />
       </group>
     </RigidBody>
   );
 }
-

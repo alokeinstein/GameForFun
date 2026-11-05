@@ -27,6 +27,11 @@ export enum WinningTeam {
   CITIZENS = "CITIZENS"
 }
 
+export enum AssignmentMethod {
+  RANDOM = "RANDOM",
+  MANUAL = "MANUAL"
+}
+
 export enum EliminationCause {
   NIGHT_KILL = "NIGHT_KILL",
   VOTED_OUT = "VOTED_OUT",
@@ -35,16 +40,19 @@ export enum EliminationCause {
 
 export interface GameConfig {
   mafiaPercentage: number;       // Default 20 (range 10 to 30)
+  mafiaCount?: number;           // Exact mafia count if specified (>0)
+  assignmentMethod?: AssignmentMethod; // RANDOM (default) or MANUAL
+  dayDurationSec?: number;       // Unified single day timer (discussion + voting)
   nightDurationSec: number;      // Default 30
-  discussionDurationSec: number; // Default 120
-  votingDurationSec: number;     // Default 30
+  discussionDurationSec: number; // Backward-compatibility alias for dayDurationSec
+  votingDurationSec: number;     // Legacy separate voting timer
   revoteDurationSec: number;     // Default 20
   morningDurationSec: number;    // Default 10
   eliminationDurationSec: number;// Default 8
   maxRevotes: number;            // Default 1
   revealRoleOnDeath: boolean;    // Default true
   allowSelfVoting: boolean;      // Default false
-  allowVoteChanging: boolean;    // Default false
+  allowVoteChanging: boolean;    // Default true
   isDevMode: boolean;            // Default false (allows 3 min players)
 }
 

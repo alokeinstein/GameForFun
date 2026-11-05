@@ -6,7 +6,8 @@ import {
   VoiceSignalRelayPayload,
   VoiceStatePayload,
   MafiaRoomState,
-  Phase
+  Phase,
+  Role
 } from "@mafia/shared";
 
 export interface RemotePeerAudio {
@@ -40,6 +41,11 @@ export class VoiceChatService {
   private vadInterval: any = null;
   private vadAnalyser: AnalyserNode | null = null;
   private vadDataArray: Uint8Array | null = null;
+  private spatialInterval: any = null;
+
+  // Private Role Context for Night Audio Gating
+  private localRole: Role | null = null;
+  private teammateIds: Set<string> = new Set();
 
   // External listeners (e.g. for UI speaking indicators)
   private stateListeners: Set<() => void> = new Set();
@@ -48,6 +54,12 @@ export class VoiceChatService {
   public subscribe(cb: () => void): () => void {
     this.stateListeners.add(cb);
     return () => this.stateListeners.delete(cb);
+  }
+
+  public setRoleContext(role: Role | null, teammateIds: string[] = []): void {
+    this.localRole = role;
+    this.teammateIds = new Set(teammateIds);
+    this.updateSpatialAudio();
   }
 
   private notify() {
@@ -132,6 +144,14 @@ export class VoiceChatService {
         }
       }
     });
+
+    // Start periodic spatial audio and night gating evaluation loop (4Hz)
+    if (this.spatialInterval) {
+      clearInterval(this.spatialInterval);
+    }
+    this.spatialInterval = setInterval(() => {
+      this.updateSpatialAudio();
+    }, 250);
   }
 
   /**
@@ -321,7 +341,7 @@ export class VoiceChatService {
   }
 
   /**
-   * Update audio gain based on 3D distance and dead player isolation rules
+   * Update audio gain based on 3D distance, night phase isolation, and dead player rules
    */
   public updateSpatialAudio(): void {
     if (!this.room || !this.audioCtx) return;
@@ -334,6 +354,31 @@ export class VoiceChatService {
     const isMatchActive =
       currentPhase !== Phase.WAITING_FOR_PLAYERS &&
       currentPhase !== Phase.VICTORY;
+
+    // Night phase voice isolation rules:
+    // Only living Mafia members can communicate via voice during the night.
+    const isNight = currentPhase === Phase.NIGHT;
+    const isLocalLivingMafia = this.localRole === Role.MAFIA && localPlayer.isAlive;
+
+    // Enforce local microphone hardware track enablement
+    if (this.localStream) {
+      const mustMuteMic =
+        (isMatchActive && !localPlayer.isAlive) ||
+        (isNight && !isLocalLivingMafia);
+      this.localStream.getAudioTracks().forEach((track) => {
+        track.enabled = !this.isMuted && !mustMuteMic;
+      });
+    }
+
+    // If local player is a Citizen or dead during night, mute all incoming peer audio
+    if (isNight && !isLocalLivingMafia) {
+      this.peers.forEach((peer) => {
+        if (peer.gainNode) {
+          peer.gainNode.gain.setValueAtTime(0, this.audioCtx!.currentTime);
+        }
+      });
+      return;
+    }
 
     this.peers.forEach((peer, sessionId) => {
       if (!peer.gainNode) return;
@@ -348,6 +393,19 @@ export class VoiceChatService {
       // If remote player is dead, and local player is alive during active rounds, mute completely.
       if (isMatchActive && !remotePlayer.isAlive && localPlayer.isAlive) {
         peer.gainNode.gain.setValueAtTime(0, this.audioCtx!.currentTime);
+        return;
+      }
+
+      // Night Phase Gating Rule:
+      // During NIGHT, only living Mafia can hear each other.
+      if (isNight) {
+        const isRemoteLivingMafia = this.teammateIds.has(sessionId) && remotePlayer.isAlive;
+        if (!isLocalLivingMafia || !isRemoteLivingMafia) {
+          peer.gainNode.gain.setValueAtTime(0, this.audioCtx!.currentTime);
+          return;
+        }
+        // Living Mafia private conference during night: crystal clear audio
+        peer.gainNode.gain.setTargetAtTime(1.0, this.audioCtx!.currentTime, 0.1);
         return;
       }
 
@@ -389,6 +447,14 @@ export class VoiceChatService {
       clearInterval(this.vadInterval);
       this.vadInterval = null;
     }
+
+    if (this.spatialInterval) {
+      clearInterval(this.spatialInterval);
+      this.spatialInterval = null;
+    }
+
+    this.localRole = null;
+    this.teammateIds.clear();
 
     this.localStream?.getTracks().forEach((track) => track.stop());
     this.localStream = null;

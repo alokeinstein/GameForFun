@@ -118,7 +118,7 @@ describe.sequential("Milestone 2 - Server Authoritative Game Loop & Mechanics", 
       isDevMode: true,
       nightDurationSec: 1,
       morningDurationSec: 1,
-      discussionDurationSec: 1,
+      discussionDurationSec: 3,
       votingDurationSec: 1,
       eliminationDurationSec: 1
     });
@@ -182,7 +182,7 @@ describe.sequential("Milestone 2 - Server Authoritative Game Loop & Mechanics", 
       isDevMode: true,
       nightDurationSec: 1,
       morningDurationSec: 1,
-      discussionDurationSec: 1,
+      discussionDurationSec: 3,
       votingDurationSec: 2,
       eliminationDurationSec: 1
     });
@@ -205,18 +205,19 @@ describe.sequential("Milestone 2 - Server Authoritative Game Loop & Mechanics", 
 
     r1.send(ClientMessageType.START_GAME);
 
-    // Advance through Role Assignment (1s) -> Night (1s) -> Morning (1s) -> Discussion (1s) -> Voting
-    // Total wait: ~4.5s
-    await new Promise(r => setTimeout(r, 4600));
+    // Advance to day
+    await new Promise(r => setTimeout(r, 3400));
 
-    expect(r1.state.phase).toBe(Phase.DAY_VOTING);
+
+    expect(r1.state.phase).toBe(Phase.DAY_DISCUSSION);
 
     // 2 Citizens cast votes for the Mafia player (2 / 3 = 66.6% >= 50% threshold)
     citizenRooms[0].send(ClientMessageType.CAST_VOTE, { targetId: mafiaSessionId });
     citizenRooms[1].send(ClientMessageType.CAST_VOTE, { targetId: mafiaSessionId });
 
     // Wait for voting timer (2s) and elimination announcement (1s)
-    await new Promise(r => setTimeout(r, 3600));
+    await new Promise(r => setTimeout(r, 4500));
+
 
     // Mafia player should be dead
     const mafiaPlayer = r1.state.players.get(mafiaSessionId);

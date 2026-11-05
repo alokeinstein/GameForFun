@@ -1,4 +1,4 @@
-import { GameConfig } from "@mafia/game-rules";
+import { GameConfig, AssignmentMethod } from "@mafia/game-rules";
 
 export enum GameMode {
   UNSELECTED = "UNSELECTED",
@@ -8,6 +8,9 @@ export enum GameMode {
 
 export const DEFAULT_GAME_CONFIG: GameConfig = {
   mafiaPercentage: 20,
+  mafiaCount: 0,
+  assignmentMethod: AssignmentMethod.RANDOM,
+  dayDurationSec: 120,
   nightDurationSec: 30,
   discussionDurationSec: 120,
   votingDurationSec: 30,
@@ -17,7 +20,7 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
   maxRevotes: 1,
   revealRoleOnDeath: true,
   allowSelfVoting: false,
-  allowVoteChanging: false,
+  allowVoteChanging: true,
   isDevMode: false
 };
 
