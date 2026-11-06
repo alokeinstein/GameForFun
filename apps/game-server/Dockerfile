@@ -5,6 +5,7 @@ WORKDIR /app
 # Copy package manifests
 COPY package*.json ./
 COPY turbo.json ./
+COPY tsconfig.base.json ./
 COPY packages/game-rules/package*.json ./packages/game-rules/
 COPY packages/shared/package*.json ./packages/shared/
 COPY packages/database/package*.json ./packages/database/
